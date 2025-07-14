@@ -1,0 +1,53 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+auth-test-harness
+auth-test-harness.git.exe*
+
+# Test files
+*.test
+test_oauth.sh
+test_oauth_sc.sh
+
+# Coverage files
+*.out
+*.coverprofile
+coverage.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+API.md
+LICENSE
+
+# Examples
+examples/
+
+# Environment files
+.env
+.env.example
+
+# Temporary files
+*.tmp
+*.temp
