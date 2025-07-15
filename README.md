@@ -15,7 +15,7 @@ A mock OAuth 2.0 and OpenID Connect service for testing purposes, implementing t
 ### 1. Authorization Endpoint
 
 ```sh
-GET [as defined in AUTHORIZATION_ENDPOINT environment variable]
+GET [`AUTHORIZATION_ENDPOINT`]
 ```
 
 **Parameters:**
@@ -24,14 +24,14 @@ GET [as defined in AUTHORIZATION_ENDPOINT environment variable]
 - `client_id` (required)
 - `state` (optional but recommended)
 - `redirect_uri` (required)
-- `scope` - As defined in SCOPES_SUPPORTED environment variable (required)
+- `scope` - one of defined in `SCOPES_SUPPORTED` environment variable (required)
 - `prompt` (optional)
-- `acr_values` - As defined in ACR_VALUES_SUPPORTED environment variable (required)
+- `acr_values` - one of defined in `ACR_VALUES_SUPPORTED` environment variable (required)
 - `ui_locales` (optional)
 
 **Supported ACR Values:**
 
-- As defined in ACR_VALUES_SUPPORTED environment variable
+- Defines in `ACR_VALUES_SUPPORTED` environment variable
 
 **Response:**
 
@@ -40,7 +40,7 @@ Redirects to `redirect_uri` with `code` and `state` parameters.
 ### 2. Token Endpoint
 
 ```sh
-POST [as defined in TOKEN_ENDPOINT environment variable]
+POST [`TOKEN_ENDPOINT`]
 ```
 
 **Headers:**
@@ -67,7 +67,7 @@ POST [as defined in TOKEN_ENDPOINT environment variable]
 ### 3. UserInfo Endpoint
 
 ```sh
-GET [as defined in USERINFO_ENDPOINT environment variable]
+GET [`USERINFO_ENDPOINT`]
 ```
 
 **Headers:**
@@ -78,22 +78,22 @@ GET [as defined in USERINFO_ENDPOINT environment variable]
 
 ```json
 {
-  "sub": "UNIQUE_USER_ID",
+  "sub": "`UNIQUE_USER_ID`",
   "domain": "citizen",
   "acr": "urn:safelayer:tws:policies:authentication:level:high",
-  "amr": ["as defined in ACR_VALUES_SUPPORTED environment variable"],
-  "given_name": "as defined in MOBILE_GIVEN_NAME or SC_GIVEN_NAME environment variable",
-  "family_name": "as defined in MOBILE_FAMILY_NAME or SC_FAMILY_NAME environment variable",
+  "amr": ["`ACR_VALUES_SUPPORTED` used in request"],
+  "given_name": "as defined in `SC_GIVEN_NAME` (or `MOBILE_GIVEN_NAME`) environment variable",
+  "family_name": "as defined in `SC_FAMILY_NAME` (or `MOBILE_FAMILY_NAME`) environment variable",
   "name": "as defined in given_name + family_name environment variables",
-  "serial_number": "as defined in SERIAL_NUMBER environment variable",
+  "serial_number": "as defined in `SERIAL_NUMBER` environment variable",
   "eips": ""
 }
 ```
 
 **User Profiles:**
 
-- Mobile ID (when ACR_VALUES_SUPPORTED contain `urn:eparaksts:authentication:flow:mobileid`): Uses MOBILE_GIVEN_NAME and MOBILE_FAMILY_NAME
-- Smart Card (when ACR_VALUES_SUPPORTED contain `urn:eparaksts:authentication:flow:sc_plugin`): Uses SC_GIVEN_NAME and SC_FAMILY_NAME
+- Mobile ID (when `ACR_VALUES_SUPPORTED` contain `urn:eparaksts:authentication:flow:mobileid`): Uses `MOBILE_GIVEN_NAME` and `MOBILE_FAMILY_NAME`
+- Smart Card (when `ACR_VALUES_SUPPORTED` contain `urn:eparaksts:authentication:flow:sc_plugin`): Uses `SC_GIVEN_NAME` and `SC_FAMILY_NAME`
 
 ## Environment Variables
 

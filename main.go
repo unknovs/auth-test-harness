@@ -31,6 +31,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 
 		response := responses.OpenIDConfigurationResponse(
+			config.Protocol,
 			config.Host,
 			config.AuthorizationEndpoint,
 			config.TokenEndpoint,
@@ -59,6 +60,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 
 		response := responses.ServiceInfoResponse(
+			config.Protocol,
 			config.Host,
 			config.AuthorizationEndpoint,
 			config.TokenEndpoint,
@@ -80,14 +82,15 @@ func main() {
 	}()
 
 	// Start server
-	addr := ":" + config.Port
+	addr := config.BindAddress + ":" + config.Port
 	log.Printf("Starting OAuth OIDC Mock Service on %s", addr)
 	log.Printf("Host: %s", config.Host)
+	log.Printf("Protocol: %s", config.Protocol)
 	log.Printf("Endpoints:")
-	log.Printf("  Authorization: http://%s%s", config.Host, config.AuthorizationEndpoint)
-	log.Printf("  Token: http://%s%s", config.Host, config.TokenEndpoint)
-	log.Printf("  UserInfo: http://%s%s", config.Host, config.UserInfoEndpoint)
-	log.Printf("  Health: http://%s/health", config.Host)
+	log.Printf("  Authorization: %s://%s%s", config.Protocol, config.Host, config.AuthorizationEndpoint)
+	log.Printf("  Token: %s://%s%s", config.Protocol, config.Host, config.TokenEndpoint)
+	log.Printf("  UserInfo: %s://%s%s", config.Protocol, config.Host, config.UserInfoEndpoint)
+	log.Printf("  Health: %s://%s/health", config.Protocol, config.Host)
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal("Server failed to start:", err)
