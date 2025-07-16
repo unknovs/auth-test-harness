@@ -40,7 +40,7 @@ func Load() *Config {
 	config := &Config{
 		Port:               getEnv("PORT", "8080"),
 		Host:               getEnv("HOST", "localhost:8080"),
-		Protocol:           getEnv("PROTOCOL", "https"),
+		Protocol:           getEnv("PROTOCOL", "http"),
 		BindAddress:        getEnv("BIND_ADDRESS", "0.0.0.0"),
 		BasicAuthValue:     getEnv("BASIC_AUTH_VALUE", "dGVzdDp0ZXN0"), // base64 encoded "test:test"
 		TokenExpirationMin: 10,                                         // hardcoded as per requirements
