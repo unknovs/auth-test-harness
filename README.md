@@ -10,6 +10,10 @@ A mock OAuth 2.0 and OpenID Connect service for testing purposes, implementing t
 - Support for multiple authentication methods (Mobile ID and Smart Card)
 - Configurable through environment variables
 
+## Docker compose
+
+[Docker compose](./docker-compose.yaml) is made to automate eParaksts authentication platform tests. [Postman collection](postman_collection.json) added for this compose as well.  
+
 ## Endpoints
 
 ### 1. Authorization Endpoint

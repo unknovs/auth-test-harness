@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  auth-test-harness:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      HOST: "localhost:8080"
+      BASIC_AUTH_VALUE: "dGVzdDp0ZXN0" # base64 for test:test
+      AUTHORIZATION_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as"
+      TOKEN_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as/token"
+      USERINFO_ENDPOINT: "/trustedx-resources/openid/v1/users/me"
+      SCOPES_SUPPORTED: "urn:lvrtc:fpeil:aa"
+      ACR_VALUES_SUPPORTED: "urn:eparaksts:authentication:flow:mobileid,urn:eparaksts:authentication:flow:sc_plugin"
+      SERIAL_NUMBER: "PNOLV-123456-12345"
+      MOBILE_GIVEN_NAME: "Jane"
+      MOBILE_FAMILY_NAME: "Mobile"
+      SC_GIVEN_NAME: "John"
+      SC_FAMILY_NAME: "Cardreader"
+
+    restart: unless-stopped

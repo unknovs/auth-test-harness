@@ -38,7 +38,7 @@ type Config struct {
 // Load loads environment variables with default values
 func Load() *Config {
 	config := &Config{
-		Port:               getEnv("PORT", "8080"),
+		Port:               getEnv("PORT", "8080"), // port binded inside the container. Shall be same as in Dockerfile
 		Host:               getEnv("HOST", "localhost:8080"),
 		Protocol:           getEnv("PROTOCOL", "http"),
 		BindAddress:        getEnv("BIND_ADDRESS", "0.0.0.0"),
