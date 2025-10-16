@@ -5,16 +5,26 @@ import (
 	"strings"
 )
 
-func OpenIDConfigurationResponse(host, authEndpoint, tokenEndpoint, userinfoEndpoint string, scopes, acrValues []string) string {
+func OpenIDConfigurationResponse(protocol, host, authEndpoint, tokenEndpoint, userinfoEndpoint string, scopes, acrValues []string) string {
 	scopesJSON := `["` + strings.Join(scopes, `","`) + `"]`
 	acrValuesJSON := `["` + strings.Join(acrValues, `","`) + `"]`
 
+	buildURL := func(protocol, host, path string) string {
+		return fmt.Sprintf("%s://%s%s", protocol, host, path)
+	}
+
+	issuer := buildURL(protocol, host, "")
+	authURL := buildURL(protocol, host, authEndpoint)
+	tokenURL := buildURL(protocol, host, tokenEndpoint)
+	userinfoURL := buildURL(protocol, host, userinfoEndpoint)
+	jwksURL := buildURL(protocol, host, "/.well-known/jwks.json")
+
 	return fmt.Sprintf(`{
-	"issuer": "http://%s",
-	"authorization_endpoint": "http://%s%s",
-	"token_endpoint": "http://%s%s",
-	"userinfo_endpoint": "http://%s%s",
-	"jwks_uri": "http://%s/.well-known/jwks.json",
+	"issuer": "%s",
+	"authorization_endpoint": "%s",
+	"token_endpoint": "%s",
+	"userinfo_endpoint": "%s",
+	"jwks_uri": "%s",
 	"scopes_supported": %s,
 	"response_types_supported": ["code"],
 	"grant_types_supported": ["authorization_code"],
@@ -22,5 +32,5 @@ func OpenIDConfigurationResponse(host, authEndpoint, tokenEndpoint, userinfoEndp
 	"id_token_signing_alg_values_supported": ["RS256"],
 	"token_endpoint_auth_methods_supported": ["client_secret_basic"],
 	"acr_values_supported": %s
-}`, host, host, authEndpoint, host, tokenEndpoint, host, userinfoEndpoint, host, scopesJSON, acrValuesJSON)
+}`, issuer, authURL, tokenURL, userinfoURL, jwksURL, scopesJSON, acrValuesJSON)
 }
