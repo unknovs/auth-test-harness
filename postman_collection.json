@@ -1,0 +1,318 @@
+{
+	"info": {
+		"_postman_id": "60223049-ba79-4c60-a6ab-a822f4ed7f36",
+		"name": "OAuth OIDC Mock Service",
+		"description": "Postman collection for testing the OAuth OIDC Mock Service based on README.md, API.md, and docker-compose.yaml",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "9229934"
+	},
+	"item": [
+		{
+			"name": "Service Information",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "OpenID Connect Discovery",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/.well-known/openid_configuration",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						".well-known",
+						"openid_configuration"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/health",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Authorization Request (Mobile ID)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/trustedx-authserver/oauth/lvrtc-eipsign-as?response_type=code&client_id=test&redirect_uri=https://example.com/callback&scope=urn:lvrtc:fpeil:aa&acr_values=urn:eparaksts:authentication:flow:mobileid&state=xyz123",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"trustedx-authserver",
+						"oauth",
+						"lvrtc-eipsign-as"
+					],
+					"query": [
+						{
+							"key": "response_type",
+							"value": "code"
+						},
+						{
+							"key": "client_id",
+							"value": "test"
+						},
+						{
+							"key": "redirect_uri",
+							"value": "https://example.com/callback"
+						},
+						{
+							"key": "scope",
+							"value": "urn:lvrtc:fpeil:aa"
+						},
+						{
+							"key": "acr_values",
+							"value": "urn:eparaksts:authentication:flow:mobileid"
+						},
+						{
+							"key": "state",
+							"value": "xyz123"
+						}
+					]
+				},
+				"description": "Initiates OAuth authorization flow. This will redirect to the redirect_uri with code and state. Copy the code from the URL for the next request."
+			},
+			"response": []
+		},
+		{
+			"name": "Authorization Request (Smart Card)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/trustedx-authserver/oauth/lvrtc-eipsign-as?response_type=code&client_id=demo_client&redirect_uri=https://example.com/callback&scope=urn:lvrtc:fpeil:aa&acr_values=urn:eparaksts:authentication:flow:sc_plugin&state=xyz123",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"trustedx-authserver",
+						"oauth",
+						"lvrtc-eipsign-as"
+					],
+					"query": [
+						{
+							"key": "response_type",
+							"value": "code"
+						},
+						{
+							"key": "client_id",
+							"value": "demo_client"
+						},
+						{
+							"key": "redirect_uri",
+							"value": "https://example.com/callback"
+						},
+						{
+							"key": "scope",
+							"value": "urn:lvrtc:fpeil:aa"
+						},
+						{
+							"key": "acr_values",
+							"value": "urn:eparaksts:authentication:flow:sc_plugin"
+						},
+						{
+							"key": "state",
+							"value": "xyz123"
+						}
+					]
+				},
+				"description": "Initiates OAuth authorization flow for Smart Card. This will redirect to the redirect_uri with code and state. Copy the code from the URL for the next request."
+			},
+			"response": []
+		},
+		{
+			"name": "Token Request",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    const response = pm.response.json();",
+							"    pm.collectionVariables.set('access_token', response.access_token);",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "username",
+							"value": "test",
+							"type": "string"
+						},
+						{
+							"key": "password",
+							"value": "test",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/x-www-form-urlencoded"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "grant_type",
+							"value": "authorization_code"
+						},
+						{
+							"key": "code",
+							"value": "{{auth_code}}",
+							"description": "Authorization code obtained from the authorization request redirect URL"
+						},
+						{
+							"key": "redirect_uri",
+							"value": "https://example.com/callback"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8080/trustedx-authserver/oauth/lvrtc-eipsign-as/token",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"trustedx-authserver",
+						"oauth",
+						"lvrtc-eipsign-as",
+						"token"
+					]
+				},
+				"description": "Exchanges authorization code for access token. Set the auth_code variable first."
+			},
+			"response": []
+		},
+		{
+			"name": "UserInfo Request",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/trustedx-resources/openid/v1/users/me",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"trustedx-resources",
+						"openid",
+						"v1",
+						"users",
+						"me"
+					]
+				},
+				"description": "Retrieves user information using the access token. This will return Mobile ID user profile if acr_values was mobileid."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8082",
+			"type": "string"
+		},
+		{
+			"key": "client_id",
+			"value": "demo_client",
+			"type": "string"
+		},
+		{
+			"key": "redirect_uri",
+			"value": "https://example.com/callback",
+			"type": "string"
+		},
+		{
+			"key": "scope",
+			"value": "urn:lvrtc:fpeil:aa",
+			"type": "string"
+		},
+		{
+			"key": "acr_values_mobile",
+			"value": "urn:eparaksts:authentication:flow:mobileid",
+			"type": "string"
+		},
+		{
+			"key": "acr_values_sc",
+			"value": "urn:eparaksts:authentication:flow:sc_plugin",
+			"type": "string"
+		},
+		{
+			"key": "state",
+			"value": "xyz123",
+			"type": "string"
+		},
+		{
+			"key": "auth_code",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

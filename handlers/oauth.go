@@ -7,10 +7,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/unknovs/auth-test-harness.git/env"
-	"github.com/unknovs/auth-test-harness.git/routes/requests"
-	"github.com/unknovs/auth-test-harness.git/routes/responses"
-	"github.com/unknovs/auth-test-harness.git/utils"
+	"github.com/unknovs/auth-test-harness/env"
+	"github.com/unknovs/auth-test-harness/routes/requests"
+	"github.com/unknovs/auth-test-harness/routes/responses"
+	"github.com/unknovs/auth-test-harness/utils"
 )
 
 // OAuthHandler handles OAuth operations
