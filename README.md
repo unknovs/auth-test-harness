@@ -14,6 +14,10 @@ A mock OAuth 2.0 and OpenID Connect service for testing purposes, implementing t
 
 [Docker compose](./docker-compose.yaml) is made to automate eParaksts authentication platform tests. [Postman collection](postman_collection.json) added for this compose as well.  
 
+## Docker image
+
+Docker image available on [DockerHub](https://hub.docker.com/r/unknovs/oauth-oidc-mock-service)
+
 ## Endpoints
 
 ### 1. Authorization Endpoint
