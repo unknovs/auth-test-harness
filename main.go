@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/unknovs/auth-test-harness.git/env"
-	"github.com/unknovs/auth-test-harness.git/handlers"
-	"github.com/unknovs/auth-test-harness.git/routes/responses"
-	"github.com/unknovs/auth-test-harness.git/utils"
+	"github.com/unknovs/auth-test-harness/env"
+	"github.com/unknovs/auth-test-harness/handlers"
+	"github.com/unknovs/auth-test-harness/routes/responses"
+	"github.com/unknovs/auth-test-harness/utils"
 )
 
 func main() {
