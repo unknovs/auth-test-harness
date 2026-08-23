@@ -95,6 +95,10 @@ func (h *OAuthHandler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) 
 	// Store the authorization code
 	h.store.StoreAuthCode(code, req.ClientID, req.RedirectURI, req.Scope, req.ACRValues)
 
+	// The code is this service's own generated value and the client id came from the
+	// request; both are echoed into a test-run log on a loopback address, never into a
+	// shared log sink.
+	//nolint:gosec // G706: deliberate — a test double logging its own handshake
 	log.Printf("Generated auth code: %s for client: %s", code, req.ClientID)
 
 	// Build redirect URL
@@ -111,7 +115,11 @@ func (h *OAuthHandler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	redirectURL.RawQuery = query.Encode()
 
-	// Redirect to the callback URL
+	// Redirect to the callback URL. A real authorization server validates redirect_uri
+	// against the client's registered allowlist; this mock accepts whatever the test asks
+	// for ON PURPOSE — exercising a wrong or hostile redirect_uri is one of the things a
+	// harness exists to do. Never run this service anywhere a real user could reach it.
+	//nolint:gosec // G710: open redirect is the point of a mock authorization endpoint
 	http.Redirect(w, r, redirectURL.String(), http.StatusFound)
 }
 
@@ -158,11 +166,13 @@ func (h *OAuthHandler) TokenHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate authorization code
 	authCodeData, valid := h.store.GetAuthCode(req.Code)
 	if !valid {
+		//nolint:gosec // G706: as above — a test double logging its own handshake
 		log.Printf("Invalid or expired auth code: %s", req.Code)
 		h.sendError(w, "invalid_grant", "Invalid or expired authorization code")
 		return
 	}
 
+	//nolint:gosec // G706: as above — a test double logging its own handshake
 	log.Printf("Valid auth code: %s for client: %s", req.Code, authCodeData.ClientID)
 
 	// Validate redirect URI
@@ -187,7 +197,9 @@ func (h *OAuthHandler) TokenHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
-	json.NewEncoder(w).Encode(response)
+	// The status and headers are already on the wire; an encode failure here can
+	// only be logged, and this is a test double on a loopback address.
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // UserInfoHandler handles the user info endpoint
@@ -217,7 +229,9 @@ func (h *OAuthHandler) UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	response := h.generateUserInfo(tokenData.ACRValues)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	// The status and headers are already on the wire; an encode failure here can
+	// only be logged, and this is a test double on a loopback address.
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // generateUserInfo generates user information based on ACR values
@@ -304,5 +318,7 @@ func (h *OAuthHandler) sendError(w http.ResponseWriter, errorCode, description s
 		ErrorDescription: description,
 	}
 
-	json.NewEncoder(w).Encode(errorResp)
+	// The status and headers are already on the wire; an encode failure here can
+	// only be logged, and this is a test double on a loopback address.
+	_ = json.NewEncoder(w).Encode(errorResp)
 }

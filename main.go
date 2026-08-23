@@ -39,7 +39,8 @@ func main() {
 			config.ScopesSupported,
 			config.ACRValuesSupported,
 		)
-		w.Write([]byte(response))
+		// Response already committed; a short write has nowhere to go from here.
+		_, _ = w.Write([]byte(response))
 	}
 
 	// OpenID Connect Discovery defines this document at
@@ -54,7 +55,8 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+		// Response already committed; a short write has nowhere to go from here.
+		_, _ = w.Write([]byte(`{"status":"ok","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
 	})
 
 	// Root endpoint - Service Information
@@ -76,7 +78,8 @@ func main() {
 			config.ScopesSupported,
 			config.ACRValuesSupported,
 		)
-		w.Write([]byte(response))
+		// Response already committed; a short write has nowhere to go from here.
+		_, _ = w.Write([]byte(response))
 	})
 
 	go func() {
@@ -100,6 +103,10 @@ func main() {
 	log.Printf("  UserInfo: %s://%s%s", config.Protocol, config.Host, config.UserInfoEndpoint)
 	log.Printf("  Health: %s://%s/health", config.Protocol, config.Host)
 
+	// No read/write timeouts: this is a mock identity provider that exists for the length
+	// of a test run, on a loopback address, driven by the test harness itself. There is no
+	// untrusted client for a timeout to protect against.
+	//nolint:gosec // test double, not an exposed server
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
