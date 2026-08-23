@@ -14,11 +14,17 @@ services:
       TOKEN_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as/token"
       USERINFO_ENDPOINT: "/trustedx-resources/openid/v1/users/me"
       SCOPES_SUPPORTED: "urn:lvrtc:fpeil:aa"
-      ACR_VALUES_SUPPORTED: "urn:eparaksts:authentication:flow:mobileid,urn:eparaksts:authentication:flow:sc_plugin"
+      ACR_VALUES_SUPPORTED: "urn:eparaksts:authentication:flow:mobileid,urn:eparaksts:authentication:flow:sc_plugin,urn:eparaksts:authentication:flow:mobile-eid"
       SERIAL_NUMBER: "PNOLV-123456-12345"
       MOBILE_GIVEN_NAME: "Jane"
       MOBILE_FAMILY_NAME: "Mobile"
       SC_GIVEN_NAME: "John"
       SC_FAMILY_NAME: "Cardreader"
+      EIDSCAN_GIVEN_NAME: "Erik"
+      EIDSCAN_FAMILY_NAME: "Scanner"
+      # Give a profile its own identity code to represent a SECOND person — the
+      # counterparty in a sharing or co-signing flow. Drop this line and every
+      # method reports the same person.
+      EIDSCAN_SERIAL_NUMBER: "PNOLV-654321-54321"
 
     restart: unless-stopped

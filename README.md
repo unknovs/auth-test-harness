@@ -5,9 +5,11 @@ A mock OAuth 2.0 and OpenID Connect service for testing purposes, implementing t
 ## Features
 
 - OAuth 2.0 Authorization Code Flow
-- OpenID Connect UserInfo endpoint
+- OpenID Connect UserInfo endpoint and discovery document
 - In-memory token storage
-- Support for multiple authentication methods (Mobile ID and Smart Card)
+- Support for multiple authentication methods (Mobile ID, Smart Card and eID Scan)
+- A per-method user profile, each with its own name and — optionally — its own
+  identity code, so one instance can stand in for two different people
 - Configurable through environment variables
 
 ## Docker compose
@@ -98,10 +100,26 @@ GET [`USERINFO_ENDPOINT`]
 }
 ```
 
-**User Profiles:**
+**User Profiles** — selected by the `acr_values` the client requested:
 
-- Mobile ID (when `ACR_VALUES_SUPPORTED` contain `urn:eparaksts:authentication:flow:mobileid`): Uses `MOBILE_GIVEN_NAME` and `MOBILE_FAMILY_NAME`
-- Smart Card (when `ACR_VALUES_SUPPORTED` contain `urn:eparaksts:authentication:flow:sc_plugin`): Uses `SC_GIVEN_NAME` and `SC_FAMILY_NAME`
+- Mobile ID (`urn:eparaksts:authentication:flow:mobileid`): `MOBILE_GIVEN_NAME`, `MOBILE_FAMILY_NAME`, `MOBILE_SERIAL_NUMBER`
+- Smart Card (`urn:eparaksts:authentication:flow:sc_plugin`, and any other requested flow): `SC_GIVEN_NAME`, `SC_FAMILY_NAME`, `SC_SERIAL_NUMBER`
+- eID Scan (`urn:eparaksts:authentication:flow:mobile-eid`): `EIDSCAN_GIVEN_NAME`, `EIDSCAN_FAMILY_NAME`, `EIDSCAN_SERIAL_NUMBER` (names fall back to the Smart Card ones — both are card-based)
+
+The `amr` reports the method that was actually requested: the trailing segment of
+the requested flow URN is carried into
+`urn:eparaksts:tws:policies:authentication:adaptive:methods:<segment>`. So a client
+that forces a specific method can assert it got that method, and a flow this
+service was never taught about still reports a well-formed method URN. (The live
+platform currently reports `…methods:mobileid` for both the mobile and the eID Scan
+flow and distinguishes them only in the `acr`; reporting the requested method is the
+more useful behaviour for a test double.)
+
+Each profile may carry **its own identity code**. A system that keys a person on
+their identity code then sees a *different person per flow*, which is what lets one
+instance stand in for two parties — say a document owner and a counterparty — in a
+sharing or co-signing flow. Leave the per-profile variables unset and every method
+reports the single `SERIAL_NUMBER`, i.e. the same person however they signed in.
 
 ## Environment Variables
 
@@ -124,11 +142,11 @@ GET [`USERINFO_ENDPOINT`]
 
 ### User Profile Configuration
 
-- `SERIAL_NUMBER` - Serial number for user profiles
-- `MOBILE_GIVEN_NAME` - Given name for Mobile ID user
-- `MOBILE_FAMILY_NAME` - Family name for Mobile ID user
-- `SC_GIVEN_NAME` - Given name for Smart Card user
-- `SC_FAMILY_NAME` - Family name for Smart Card user
+- `SERIAL_NUMBER` - Identity code every profile reports unless it overrides it below
+- `MOBILE_GIVEN_NAME` / `MOBILE_FAMILY_NAME` / `MOBILE_SERIAL_NUMBER` - Mobile ID user
+- `SC_GIVEN_NAME` / `SC_FAMILY_NAME` / `SC_SERIAL_NUMBER` - Smart Card user
+- `EIDSCAN_GIVEN_NAME` / `EIDSCAN_FAMILY_NAME` / `EIDSCAN_SERIAL_NUMBER` - eID Scan user
+  (names default to the Smart Card ones; the identity code defaults to `SERIAL_NUMBER`)
 
 ## Usage
 

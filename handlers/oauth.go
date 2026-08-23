@@ -230,26 +230,68 @@ func (h *OAuthHandler) generateUserInfo(acrValues string) *responses.UserInfoRes
 		EIPS:         "",
 	}
 
+	// Each profile may carry its own identity code. Systems that key a person on
+	// their identity code then see a DIFFERENT person per flow, which is what
+	// lets one instance stand in for two parties — an owner and a counterparty —
+	// in a flow where a document is shared between them. Unset per profile, they
+	// all report the one SERIAL_NUMBER, i.e. the same person by any method.
+
+	// The authentication method is reported in the amr, derived from the flow that
+	// was requested, so a client that forces a specific method gets that method
+	// back and can verify the binding. Each method carries its own name profile.
+	response.AMR = []string{amrForFlow(acrValues)}
+
 	switch acrValues {
-	case "urn:eparaksts:authentication:flow:mobileid":
-		response.AMR = []string{"urn:eparaksts:tws:policies:authentication:adaptive:methods:mobileid"}
+	case flowMobileID:
 		response.GivenName = h.config.MobileGivenName
 		response.FamilyName = h.config.MobileFamilyName
-		response.Name = h.config.MobileGivenName + " " + h.config.MobileFamilyName
-	case "urn:eparaksts:authentication:flow:sc_plugin":
-		response.AMR = []string{"urn:eparaksts:tws:policies:authentication:adaptive:methods:sc_plugin"}
-		response.GivenName = h.config.SCGivenName
-		response.FamilyName = h.config.SCFamilyName
-		response.Name = h.config.SCGivenName + " " + h.config.SCFamilyName
+		response.SerialNumber = h.config.MobileSerialNumber
+	case flowEIDScan:
+		response.GivenName = h.config.EIDScanGivenName
+		response.FamilyName = h.config.EIDScanFamilyName
+		response.SerialNumber = h.config.EIDScanSerialNumber
 	default:
-		// Default fallback
-		response.AMR = []string{"urn:authentication:adaptive:methods:plugin"}
+		// Smart card, and any other advertised flow.
 		response.GivenName = h.config.SCGivenName
 		response.FamilyName = h.config.SCFamilyName
-		response.Name = h.config.SCGivenName + " " + h.config.SCFamilyName
+		response.SerialNumber = h.config.SCSerialNumber
 	}
+	response.Name = strings.TrimSpace(response.GivenName + " " + response.FamilyName)
 
 	return response
+}
+
+// Requested authentication flows (the acr_values a client sends).
+const (
+	flowMobileID = "urn:eparaksts:authentication:flow:mobileid"
+	flowSCPlugin = "urn:eparaksts:authentication:flow:sc_plugin"
+	flowEIDScan  = "urn:eparaksts:authentication:flow:mobile-eid"
+
+	// The reported-method prefix: this URN plus the method segment forms the amr.
+	amrMethodPrefix = "urn:eparaksts:tws:policies:authentication:adaptive:methods:"
+)
+
+// amrForFlow maps a requested flow URN to the reported authentication-method
+// URN by carrying its trailing method segment across — so mobileid, sc_plugin,
+// mobile-eid and any future flow segment are all reported truthfully without a
+// per-method branch. An unrecognisable value reports the smart-card method, the
+// same fallback the name profile uses.
+//
+// Note for anyone comparing against the live platform: it currently reports the
+// same amr (…methods:mobileid) for both the mobile and the eID Scan flow and
+// distinguishes them only in the acr. Reporting the requested method here is the
+// more useful behaviour for a test double, because it lets a caller assert that
+// the method it forced is the method it got.
+func amrForFlow(acrValues string) string {
+	segment := ""
+	if i := strings.LastIndex(acrValues, ":"); i >= 0 && i+1 < len(acrValues) {
+		segment = acrValues[i+1:]
+	}
+	if segment == "" {
+		segment = strings.TrimPrefix(flowSCPlugin, "urn:eparaksts:authentication:flow:")
+	}
+
+	return amrMethodPrefix + segment
 }
 
 // sendError sends an error response

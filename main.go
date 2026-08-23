@@ -26,7 +26,7 @@ func main() {
 
 	mux.HandleFunc(config.UserInfoEndpoint, oauthHandler.UserInfoHandler)
 
-	mux.HandleFunc("/.well-known/openid_configuration", func(w http.ResponseWriter, r *http.Request) {
+	discovery := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
@@ -40,7 +40,15 @@ func main() {
 			config.ACRValuesSupported,
 		)
 		w.Write([]byte(response))
-	})
+	}
+
+	// OpenID Connect Discovery defines this document at
+	// /.well-known/openid-configuration (hyphen). That is the path every
+	// spec-compliant client fetches, so it is the one to serve.
+	mux.HandleFunc("/.well-known/openid-configuration", discovery)
+	// The underscore spelling this service originally shipped, kept so anything
+	// already pointing at it keeps working. Prefer the hyphen path above.
+	mux.HandleFunc("/.well-known/openid_configuration", discovery)
 
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
