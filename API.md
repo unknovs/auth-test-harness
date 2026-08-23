@@ -12,7 +12,7 @@ http://localhost:8080
 
 ## Authentication Methods
 
-The service supports two authentication methods controlled by the `acr_values` parameter and set as environmental values (two type of users can be defined)
+The service supports three authentication methods — Mobile ID, Smart Card and eID Scan — selected by the `acr_values` parameter and configured as environment values. Each method has its own user profile (name, and optionally its own identity code), so more than one person can be represented by a single instance.
 
 ## Endpoints
 
@@ -30,7 +30,7 @@ Returns service metadata and available endpoints.
 {
   "service": "OAuth OIDC Mock Service",
   "version": "1.0.0",
-  "openid_configuration": "http://localhost:8080/.well-known/openid_configuration",
+  "openid_configuration": "http://localhost:8080/.well-known/openid-configuration",
   "endpoints": {
     "authorize": "as defined in AUTHORIZATION_ENDPOINT environment variable",
     "token": "as defined in TOKEN_ENDPOINT environment variable",
@@ -47,7 +47,7 @@ Returns service metadata and available endpoints.
 ### 2. OpenID Connect Discovery
 
 ```http
-GET /.well-known/openid_configuration
+GET /.well-known/openid-configuration
 ```
 
 Returns OpenID Connect Discovery information (RFC 8414 compliant).

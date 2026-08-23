@@ -13,7 +13,7 @@ func ServiceInfoResponse(protocol, host, authEndpoint, tokenEndpoint, userinfoEn
 	scopesJSON := `["` + strings.Join(scopes, `","`) + `"]`
 	acrValuesJSON := `["` + strings.Join(acrValues, `","`) + `"]`
 
-	openidConfig := buildURL(protocol, host, "/.well-known/openid_configuration")
+	openidConfig := buildURL(protocol, host, "/.well-known/openid-configuration")
 	authorizeURL := buildURL(protocol, host, authEndpoint)
 	tokenURL := buildURL(protocol, host, tokenEndpoint)
 	userinfoURL := buildURL(protocol, host, userinfoEndpoint)
