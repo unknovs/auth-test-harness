@@ -21,26 +21,22 @@ func GenerateAccessToken() string {
 	return base64.URLEncoding.EncodeToString(bytes)
 }
 
-// GenerateSubject generates a random subject identifier
-func GenerateSubject() string {
-	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
-}
-
 // InMemoryStore represents a simple in-memory storage for codes and tokens
 type InMemoryStore struct {
 	authCodes    map[string]AuthCodeData
 	accessTokens map[string]TokenData
 }
 
-// AuthCodeData holds information about an authorization code
+// AuthCodeData holds information about an authorization code. Nonce is the value
+// the client sent with its authorization request, carried into the id_token the
+// code is exchanged for so the client can bind the token to that request.
 type AuthCodeData struct {
 	Code        string
 	ClientID    string
 	RedirectURI string
 	Scope       string
 	ACRValues   string
+	Nonce       string
 	ExpiresAt   time.Time
 }
 
@@ -60,13 +56,14 @@ func NewInMemoryStore() *InMemoryStore {
 }
 
 // StoreAuthCode stores an authorization code
-func (s *InMemoryStore) StoreAuthCode(code, clientID, redirectURI, scope, acrValues string) {
+func (s *InMemoryStore) StoreAuthCode(code, clientID, redirectURI, scope, acrValues, nonce string) {
 	s.authCodes[code] = AuthCodeData{
 		Code:        code,
 		ClientID:    clientID,
 		RedirectURI: redirectURI,
 		Scope:       scope,
 		ACRValues:   acrValues,
+		Nonce:       nonce,
 		ExpiresAt:   time.Now().Add(10 * time.Minute),
 	}
 }

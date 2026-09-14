@@ -8,7 +8,18 @@ import (
 )
 
 func testHandler() *OAuthHandler {
+	key, err := utils.NewSigningKey()
+	if err != nil {
+		panic(err)
+	}
+
 	return NewOAuthHandler(&env.Config{
+		Protocol:            "http",
+		Host:                "idp.test:8080",
+		BasicAuthValue:      "dGVzdDp0ZXN0",
+		TokenExpirationMin:  10,
+		ScopesSupported:     []string{"openid"},
+		ACRValuesSupported:  []string{flowMobileID, flowSCPlugin, flowEIDScan, flowDirectory, flowDirectoryGuest},
 		SerialNumber:        "PNOLV-111111-11111",
 		MobileGivenName:     "Jane",
 		MobileFamilyName:    "Mobile",
@@ -19,7 +30,9 @@ func testHandler() *OAuthHandler {
 		EIDScanGivenName:    "Erik",
 		EIDScanFamilyName:   "Scanner",
 		EIDScanSerialNumber: "PNOLV-222222-22222",
-	}, utils.NewInMemoryStore())
+		DirectoryGivenName:  "Ilze",
+		DirectoryFamilyName: "Ozola",
+	}, utils.NewInMemoryStore(), key)
 }
 
 // Each requested flow must come back with its own name profile and with the

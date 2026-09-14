@@ -42,6 +42,15 @@ type Config struct {
 	EIDScanGivenName    string
 	EIDScanFamilyName   string
 	EIDScanSerialNumber string
+
+	// Directory user profile: a person signing in with a work account at their
+	// organisation's directory. It carries a name and a durable object id, and
+	// NO identity code — a directory holds none. Selected by the directory flow
+	// (see the handlers); its guest variant is the same person flagged as a
+	// guest of the directory rather than a member of it.
+	DirectoryGivenName  string
+	DirectoryFamilyName string
+	DirectoryObjectID   string
 }
 
 // Load loads environment variables with default values
@@ -80,6 +89,12 @@ func Load() *Config {
 		EIDScanGivenName:    getEnv("EIDSCAN_GIVEN_NAME", os.Getenv("SC_GIVEN_NAME")),
 		EIDScanFamilyName:   getEnv("EIDSCAN_FAMILY_NAME", os.Getenv("SC_FAMILY_NAME")),
 		EIDScanSerialNumber: getEnv("EIDSCAN_SERIAL_NUMBER", os.Getenv("SERIAL_NUMBER")),
+
+		// Directory user profile. The object id defaults to a value derived from
+		// the names, so it is stable across restarts without anyone declaring it.
+		DirectoryGivenName:  getEnv("DIRECTORY_GIVEN_NAME", "Ilze"),
+		DirectoryFamilyName: getEnv("DIRECTORY_FAMILY_NAME", "Ozola"),
+		DirectoryObjectID:   os.Getenv("DIRECTORY_OBJECT_ID"),
 	}
 	return config
 }

@@ -16,7 +16,13 @@ func main() {
 
 	store := utils.NewInMemoryStore()
 
-	oauthHandler := handlers.NewOAuthHandler(config, store)
+	// The id_token signing key: generated per start, published at the jwks_uri.
+	key, err := utils.NewSigningKey()
+	if err != nil {
+		log.Fatal("Could not generate the signing key:", err)
+	}
+
+	oauthHandler := handlers.NewOAuthHandler(config, store, key)
 
 	mux := http.NewServeMux()
 
@@ -25,6 +31,10 @@ func main() {
 	mux.HandleFunc(config.TokenEndpoint, oauthHandler.TokenHandler)
 
 	mux.HandleFunc(config.UserInfoEndpoint, oauthHandler.UserInfoHandler)
+
+	// The key set the id_tokens verify against — the address the discovery
+	// document has always advertised.
+	mux.HandleFunc("/.well-known/jwks.json", oauthHandler.JWKSHandler)
 
 	discovery := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

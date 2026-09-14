@@ -38,10 +38,16 @@ GET [`AUTHORIZATION_ENDPOINT`]
 - `prompt` (optional)
 - `acr_values` - one of defined in `ACR_VALUES_SUPPORTED` environment variable (required)
 - `ui_locales` (optional)
+- `nonce` (optional) - carried back inside the `id_token` the code is exchanged for, so the client can bind that token to this request
 
 **Supported ACR Values:**
 
-- Defines in `ACR_VALUES_SUPPORTED` environment variable
+- Defines in `ACR_VALUES_SUPPORTED` environment variable. Besides the eParaksts-shaped flows, two
+  **directory flows** are understood when listed there: `urn:auth-test-harness:flow:directory` — a
+  person signing in with a work account at their organisation's directory (a member), and
+  `urn:auth-test-harness:flow:directory-guest` — the same person flagged as a guest of that directory.
+  A directory profile carries a name and a durable object id (`oid`) and **no identity code**; its
+  `amr` is `urn:auth-test-harness:methods:directory`, so a client's method vocabulary can map it.
 
 **Response:**
 
@@ -147,6 +153,24 @@ reports the single `SERIAL_NUMBER`, i.e. the same person however they signed in.
 - `SC_GIVEN_NAME` / `SC_FAMILY_NAME` / `SC_SERIAL_NUMBER` - Smart Card user
 - `EIDSCAN_GIVEN_NAME` / `EIDSCAN_FAMILY_NAME` / `EIDSCAN_SERIAL_NUMBER` - eID Scan user
   (names default to the Smart Card ones; the identity code defaults to `SERIAL_NUMBER`)
+- `DIRECTORY_GIVEN_NAME` / `DIRECTORY_FAMILY_NAME` / `DIRECTORY_OBJECT_ID` - the directory user
+  (defaults `Ilze` / `Ozola`; the object id defaults to a value derived from the names, so it is
+  stable across restarts). This profile carries **no identity code** — a directory holds none.
+
+### The `id_token` and the key set
+
+Every token response carries an `id_token`: a JWT signed RS256 with a key generated when the
+service starts and published at `/.well-known/jwks.json` (the `jwks_uri` the discovery document
+advertises). It names the issuer (`PROTOCOL://HOST`), the client that asked (`aud`), the profile's
+subject, the request's `nonce`, the names and the method (`amr`); a directory profile's token also
+carries `oid` (the durable object id) and `acct` (`0` a member, `1` a guest) — where a directory puts
+them, so the userinfo answer carries neither. A restart rotates the key, which is what a provider's
+key rotation looks like to a client.
+
+**The subject is stable.** A profile's `sub` is the same on every login and differs between profiles
+(the guest variant is the same person and keeps it), so a client that stores a credential under the
+subject — or checks that the `id_token` and userinfo name the same person — sees one person, not a
+new one per login.
 
 ## Usage
 

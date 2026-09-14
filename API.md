@@ -142,6 +142,8 @@ Content-Type: application/x-www-form-urlencoded
 | `code` | Yes | Authorization code from step 1 |
 | `redirect_uri` | Yes | Must match authorization request |
 
+(The authorization request may carry `nonce`; it comes back inside the `id_token`.)
+
 **Example Request:**
 
 ```http
@@ -158,9 +160,16 @@ grant_type=authorization_code&code=AUTH_CODE&redirect_uri=https://example.com/ca
 {
   "access_token": "ACCESS_TOKEN",
   "token_type": "Bearer",
-  "expires_in": 600
+  "expires_in": 600,
+  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ..."
 }
 ```
+
+The `id_token` is a JWT signed RS256 with the key published at the JWKS endpoint (below). Its claims:
+`iss` (`PROTOCOL://HOST`), `aud` (the `client_id` of the authorization request), `sub` (the profile's
+stable subject — equal to the userinfo `sub`), `iat`, `exp`, `nonce` (when the authorization request
+carried one), `name`, `given_name`, `family_name`, `amr`; `acr` for the eParaksts-shaped profiles;
+`oid` and `acct` (`0` member, `1` guest) for the directory profiles.
 
 **Error Response:**
 
@@ -169,6 +178,19 @@ grant_type=authorization_code&code=AUTH_CODE&redirect_uri=https://example.com/ca
   "error": "invalid_grant",
   "error_description": "Invalid or expired authorization code"
 }
+```
+
+### 4b. JWKS Endpoint
+
+```http
+GET /.well-known/jwks.json
+```
+
+The key set the `id_token` verifies against: one RSA key, `use: sig`, `alg: RS256`, its `kid` the one
+every token's header carries. Generated when the service starts — a restart rotates it.
+
+```json
+{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"…","n":"…","e":"AQAB"}]}
 ```
 
 ### 5. UserInfo Endpoint

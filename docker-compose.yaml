@@ -14,7 +14,10 @@ services:
       TOKEN_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as/token"
       USERINFO_ENDPOINT: "/trustedx-resources/openid/v1/users/me"
       SCOPES_SUPPORTED: "urn:lvrtc:fpeil:aa"
-      ACR_VALUES_SUPPORTED: "urn:eparaksts:authentication:flow:mobileid,urn:eparaksts:authentication:flow:sc_plugin,urn:eparaksts:authentication:flow:mobile-eid"
+      # The eParaksts-shaped flows, plus the two directory flows: a work account at
+      # the person's organisation (a member of its directory) and the same person
+      # as a guest of it. A directory profile carries no identity code.
+      ACR_VALUES_SUPPORTED: "urn:eparaksts:authentication:flow:mobileid,urn:eparaksts:authentication:flow:sc_plugin,urn:eparaksts:authentication:flow:mobile-eid,urn:auth-test-harness:flow:directory,urn:auth-test-harness:flow:directory-guest"
       SERIAL_NUMBER: "PNOLV-111111-11111"
       MOBILE_GIVEN_NAME: "Jane"
       MOBILE_FAMILY_NAME: "Mobile"
@@ -26,5 +29,9 @@ services:
       # counterparty in a sharing or co-signing flow. Drop this line and every
       # method reports the same person.
       EIDSCAN_SERIAL_NUMBER: "PNOLV-222222-22222"
+      # The directory user: a name and a durable object id (derived from the names
+      # when unset), never an identity code.
+      DIRECTORY_GIVEN_NAME: "Ilze"
+      DIRECTORY_FAMILY_NAME: "Ozola"
 
     restart: unless-stopped
