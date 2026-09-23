@@ -5,9 +5,11 @@ A mock OAuth 2.0 and OpenID Connect service for testing purposes, implementing t
 ## Features
 
 - OAuth 2.0 Authorization Code Flow
-- OpenID Connect UserInfo endpoint
+- OpenID Connect UserInfo endpoint and discovery document
 - In-memory token storage
-- Support for multiple authentication methods (Mobile ID and Smart Card)
+- Support for multiple authentication methods (Mobile ID, Smart Card and eID Scan)
+- A per-method user profile, each with its own name and — optionally — its own
+  identity code, so one instance can stand in for two different people
 - Configurable through environment variables
 
 ## Docker compose
@@ -36,10 +38,16 @@ GET [`AUTHORIZATION_ENDPOINT`]
 - `prompt` (optional)
 - `acr_values` - one of defined in `ACR_VALUES_SUPPORTED` environment variable (required)
 - `ui_locales` (optional)
+- `nonce` (optional) - carried back inside the `id_token` the code is exchanged for, so the client can bind that token to this request
 
 **Supported ACR Values:**
 
-- Defines in `ACR_VALUES_SUPPORTED` environment variable
+- Defines in `ACR_VALUES_SUPPORTED` environment variable. Besides the eParaksts-shaped flows, two
+  **directory flows** are understood when listed there: `urn:auth-test-harness:flow:directory` — a
+  person signing in with a work account at their organisation's directory (a member), and
+  `urn:auth-test-harness:flow:directory-guest` — the same person flagged as a guest of that directory.
+  A directory profile carries a name and a durable object id (`oid`) and **no identity code**; its
+  `amr` is `urn:auth-test-harness:methods:directory`, so a client's method vocabulary can map it.
 
 **Response:**
 
@@ -98,10 +106,26 @@ GET [`USERINFO_ENDPOINT`]
 }
 ```
 
-**User Profiles:**
+**User Profiles** — selected by the `acr_values` the client requested:
 
-- Mobile ID (when `ACR_VALUES_SUPPORTED` contain `urn:eparaksts:authentication:flow:mobileid`): Uses `MOBILE_GIVEN_NAME` and `MOBILE_FAMILY_NAME`
-- Smart Card (when `ACR_VALUES_SUPPORTED` contain `urn:eparaksts:authentication:flow:sc_plugin`): Uses `SC_GIVEN_NAME` and `SC_FAMILY_NAME`
+- Mobile ID (`urn:eparaksts:authentication:flow:mobileid`): `MOBILE_GIVEN_NAME`, `MOBILE_FAMILY_NAME`, `MOBILE_SERIAL_NUMBER`
+- Smart Card (`urn:eparaksts:authentication:flow:sc_plugin`, and any other requested flow): `SC_GIVEN_NAME`, `SC_FAMILY_NAME`, `SC_SERIAL_NUMBER`
+- eID Scan (`urn:eparaksts:authentication:flow:mobile-eid`): `EIDSCAN_GIVEN_NAME`, `EIDSCAN_FAMILY_NAME`, `EIDSCAN_SERIAL_NUMBER` (names fall back to the Smart Card ones — both are card-based)
+
+The `amr` reports the method that was actually requested: the trailing segment of
+the requested flow URN is carried into
+`urn:eparaksts:tws:policies:authentication:adaptive:methods:<segment>`. So a client
+that forces a specific method can assert it got that method, and a flow this
+service was never taught about still reports a well-formed method URN. (The live
+platform currently reports `…methods:mobileid` for both the mobile and the eID Scan
+flow and distinguishes them only in the `acr`; reporting the requested method is the
+more useful behaviour for a test double.)
+
+Each profile may carry **its own identity code**. A system that keys a person on
+their identity code then sees a *different person per flow*, which is what lets one
+instance stand in for two parties — say a document owner and a counterparty — in a
+sharing or co-signing flow. Leave the per-profile variables unset and every method
+reports the single `SERIAL_NUMBER`, i.e. the same person however they signed in.
 
 ## Environment Variables
 
@@ -124,11 +148,29 @@ GET [`USERINFO_ENDPOINT`]
 
 ### User Profile Configuration
 
-- `SERIAL_NUMBER` - Serial number for user profiles
-- `MOBILE_GIVEN_NAME` - Given name for Mobile ID user
-- `MOBILE_FAMILY_NAME` - Family name for Mobile ID user
-- `SC_GIVEN_NAME` - Given name for Smart Card user
-- `SC_FAMILY_NAME` - Family name for Smart Card user
+- `SERIAL_NUMBER` - Identity code every profile reports unless it overrides it below
+- `MOBILE_GIVEN_NAME` / `MOBILE_FAMILY_NAME` / `MOBILE_SERIAL_NUMBER` - Mobile ID user
+- `SC_GIVEN_NAME` / `SC_FAMILY_NAME` / `SC_SERIAL_NUMBER` - Smart Card user
+- `EIDSCAN_GIVEN_NAME` / `EIDSCAN_FAMILY_NAME` / `EIDSCAN_SERIAL_NUMBER` - eID Scan user
+  (names default to the Smart Card ones; the identity code defaults to `SERIAL_NUMBER`)
+- `DIRECTORY_GIVEN_NAME` / `DIRECTORY_FAMILY_NAME` / `DIRECTORY_OBJECT_ID` - the directory user
+  (defaults `Ilze` / `Ozola`; the object id defaults to a value derived from the names, so it is
+  stable across restarts). This profile carries **no identity code** — a directory holds none.
+
+### The `id_token` and the key set
+
+Every token response carries an `id_token`: a JWT signed RS256 with a key generated when the
+service starts and published at `/.well-known/jwks.json` (the `jwks_uri` the discovery document
+advertises). It names the issuer (`PROTOCOL://HOST`), the client that asked (`aud`), the profile's
+subject, the request's `nonce`, the names and the method (`amr`); a directory profile's token also
+carries `oid` (the durable object id) and `acct` (`0` a member, `1` a guest) — where a directory puts
+them, so the userinfo answer carries neither. A restart rotates the key, which is what a provider's
+key rotation looks like to a client.
+
+**The subject is stable.** A profile's `sub` is the same on every login and differs between profiles
+(the guest variant is the same person and keeps it), so a client that stores a credential under the
+subject — or checks that the `id_token` and userinfo name the same person — sees one person, not a
+new one per login.
 
 ## Usage
 

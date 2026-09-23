@@ -23,16 +23,34 @@ type Config struct {
 	ScopesSupported    []string
 	ACRValuesSupported []string
 
-	// User profile
+	// User profile. SerialNumber is the identity code every profile reports
+	// unless that profile overrides it below.
 	SerialNumber string
 
 	// Mobile ID user profile
-	MobileGivenName  string
-	MobileFamilyName string
+	MobileGivenName    string
+	MobileFamilyName   string
+	MobileSerialNumber string
 
 	// Smart Card user profile
-	SCGivenName  string
-	SCFamilyName string
+	SCGivenName    string
+	SCFamilyName   string
+	SCSerialNumber string
+
+	// eID Scan user profile (the phone reads the physical eID card). Falls back
+	// to the Smart Card names when unset, since both are card-based.
+	EIDScanGivenName    string
+	EIDScanFamilyName   string
+	EIDScanSerialNumber string
+
+	// Directory user profile: a person signing in with a work account at their
+	// organisation's directory. It carries a name and a durable object id, and
+	// NO identity code — a directory holds none. Selected by the directory flow
+	// (see the handlers); its guest variant is the same person flagged as a
+	// guest of the directory rather than a member of it.
+	DirectoryGivenName  string
+	DirectoryFamilyName string
+	DirectoryObjectID   string
 }
 
 // Load loads environment variables with default values
@@ -58,12 +76,25 @@ func Load() *Config {
 		SerialNumber: os.Getenv("SERIAL_NUMBER"),
 
 		// Mobile ID user profile
-		MobileGivenName:  os.Getenv("MOBILE_GIVEN_NAME"),
-		MobileFamilyName: os.Getenv("MOBILE_FAMILY_NAME"),
+		MobileGivenName:    os.Getenv("MOBILE_GIVEN_NAME"),
+		MobileFamilyName:   os.Getenv("MOBILE_FAMILY_NAME"),
+		MobileSerialNumber: getEnv("MOBILE_SERIAL_NUMBER", os.Getenv("SERIAL_NUMBER")),
 
 		// Smart Card user profile
-		SCGivenName:  os.Getenv("SC_GIVEN_NAME"),
-		SCFamilyName: os.Getenv("SC_FAMILY_NAME"),
+		SCGivenName:    os.Getenv("SC_GIVEN_NAME"),
+		SCFamilyName:   os.Getenv("SC_FAMILY_NAME"),
+		SCSerialNumber: getEnv("SC_SERIAL_NUMBER", os.Getenv("SERIAL_NUMBER")),
+
+		// eID Scan user profile
+		EIDScanGivenName:    getEnv("EIDSCAN_GIVEN_NAME", os.Getenv("SC_GIVEN_NAME")),
+		EIDScanFamilyName:   getEnv("EIDSCAN_FAMILY_NAME", os.Getenv("SC_FAMILY_NAME")),
+		EIDScanSerialNumber: getEnv("EIDSCAN_SERIAL_NUMBER", os.Getenv("SERIAL_NUMBER")),
+
+		// Directory user profile. The object id defaults to a value derived from
+		// the names, so it is stable across restarts without anyone declaring it.
+		DirectoryGivenName:  getEnv("DIRECTORY_GIVEN_NAME", "Ilze"),
+		DirectoryFamilyName: getEnv("DIRECTORY_FAMILY_NAME", "Ozola"),
+		DirectoryObjectID:   os.Getenv("DIRECTORY_OBJECT_ID"),
 	}
 	return config
 }

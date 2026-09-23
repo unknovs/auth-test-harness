@@ -16,7 +16,13 @@ func main() {
 
 	store := utils.NewInMemoryStore()
 
-	oauthHandler := handlers.NewOAuthHandler(config, store)
+	// The id_token signing key: generated per start, published at the jwks_uri.
+	key, err := utils.NewSigningKey()
+	if err != nil {
+		log.Fatal("Could not generate the signing key:", err)
+	}
+
+	oauthHandler := handlers.NewOAuthHandler(config, store, key)
 
 	mux := http.NewServeMux()
 
@@ -26,7 +32,11 @@ func main() {
 
 	mux.HandleFunc(config.UserInfoEndpoint, oauthHandler.UserInfoHandler)
 
-	mux.HandleFunc("/.well-known/openid_configuration", func(w http.ResponseWriter, r *http.Request) {
+	// The key set the id_tokens verify against — the address the discovery
+	// document has always advertised.
+	mux.HandleFunc("/.well-known/jwks.json", oauthHandler.JWKSHandler)
+
+	discovery := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
@@ -39,14 +49,24 @@ func main() {
 			config.ScopesSupported,
 			config.ACRValuesSupported,
 		)
-		w.Write([]byte(response))
-	})
+		// Response already committed; a short write has nowhere to go from here.
+		_, _ = w.Write([]byte(response))
+	}
+
+	// OpenID Connect Discovery defines this document at
+	// /.well-known/openid-configuration (hyphen). That is the path every
+	// spec-compliant client fetches, so it is the one to serve.
+	mux.HandleFunc("/.well-known/openid-configuration", discovery)
+	// The underscore spelling this service originally shipped, kept so anything
+	// already pointing at it keeps working. Prefer the hyphen path above.
+	mux.HandleFunc("/.well-known/openid_configuration", discovery)
 
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+		// Response already committed; a short write has nowhere to go from here.
+		_, _ = w.Write([]byte(`{"status":"ok","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
 	})
 
 	// Root endpoint - Service Information
@@ -68,7 +88,8 @@ func main() {
 			config.ScopesSupported,
 			config.ACRValuesSupported,
 		)
-		w.Write([]byte(response))
+		// Response already committed; a short write has nowhere to go from here.
+		_, _ = w.Write([]byte(response))
 	})
 
 	go func() {
@@ -92,6 +113,10 @@ func main() {
 	log.Printf("  UserInfo: %s://%s%s", config.Protocol, config.Host, config.UserInfoEndpoint)
 	log.Printf("  Health: %s://%s/health", config.Protocol, config.Host)
 
+	// No read/write timeouts: this is a mock identity provider that exists for the length
+	// of a test run, on a loopback address, driven by the test harness itself. There is no
+	// untrusted client for a timeout to protect against.
+	//nolint:gosec // test double, not an exposed server
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
