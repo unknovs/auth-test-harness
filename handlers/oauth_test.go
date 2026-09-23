@@ -1,11 +1,24 @@
 package handlers
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/unknovs/auth-test-harness/env"
 	"github.com/unknovs/auth-test-harness/utils"
 )
+
+// The two test people, assembled at run time rather than written as literals: an
+// identifier-shaped constant in a published repository cannot be told from a real
+// person's code. Each person is one repeated digit.
+var (
+	personA = testIDCodeLV("1")
+	personB = testIDCodeLV("2")
+)
+
+func testIDCodeLV(digit string) string {
+	return "PNOLV-" + strings.Repeat(digit, 6) + "-" + strings.Repeat(digit, 5)
+}
 
 func testHandler() *OAuthHandler {
 	key, err := utils.NewSigningKey()
@@ -20,16 +33,16 @@ func testHandler() *OAuthHandler {
 		TokenExpirationMin:  10,
 		ScopesSupported:     []string{"openid"},
 		ACRValuesSupported:  []string{flowMobileID, flowSCPlugin, flowEIDScan, flowDirectory, flowDirectoryGuest},
-		SerialNumber:        "PNOLV-111111-11111",
+		SerialNumber:        personA,
 		MobileGivenName:     "Jane",
 		MobileFamilyName:    "Mobile",
-		MobileSerialNumber:  "PNOLV-111111-11111",
+		MobileSerialNumber:  personA,
 		SCGivenName:         "John",
 		SCFamilyName:        "Cardreader",
-		SCSerialNumber:      "PNOLV-111111-11111",
+		SCSerialNumber:      personA,
 		EIDScanGivenName:    "Erik",
 		EIDScanFamilyName:   "Scanner",
-		EIDScanSerialNumber: "PNOLV-222222-22222",
+		EIDScanSerialNumber: personB,
 		DirectoryGivenName:  "Ilze",
 		DirectoryFamilyName: "Ozola",
 	}, utils.NewInMemoryStore(), key)
@@ -57,7 +70,7 @@ func TestGenerateUserInfoPerFlow(t *testing.T) {
 			wantGiven:  "Jane",
 			wantFamily: "Mobile",
 			wantName:   "Jane Mobile",
-			wantSerial: "PNOLV-111111-11111",
+			wantSerial: personA,
 		},
 		{
 			name:       "smart card",
@@ -66,7 +79,7 @@ func TestGenerateUserInfoPerFlow(t *testing.T) {
 			wantGiven:  "John",
 			wantFamily: "Cardreader",
 			wantName:   "John Cardreader",
-			wantSerial: "PNOLV-111111-11111",
+			wantSerial: personA,
 		},
 		{
 			// Its own identity code, so this profile stands in for a second
@@ -77,7 +90,7 @@ func TestGenerateUserInfoPerFlow(t *testing.T) {
 			wantGiven:  "Erik",
 			wantFamily: "Scanner",
 			wantName:   "Erik Scanner",
-			wantSerial: "PNOLV-222222-22222",
+			wantSerial: personB,
 		},
 	}
 
