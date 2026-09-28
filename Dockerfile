@@ -10,7 +10,11 @@ RUN apk --no-cache add git ca-certificates tzdata && \
 
 COPY . ./
 
-RUN go build -ldflags="-w -s" -tags 'netgo osusergo' -o publish/server . 
+# Go's module and build caches are cache mounts, so a rebuild recompiles only what
+# changed; neither is ever part of the image.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags="-w -s" -tags 'netgo osusergo' -o publish/server .
 # && \
 RUN    mkdir -p publish/etc/ssl/certs/ && \
     mkdir -p publish/usr/share/zoneinfo/ && \
