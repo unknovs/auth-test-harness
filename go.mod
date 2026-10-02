@@ -1,3 +1,3 @@
 module github.com/unknovs/auth-test-harness
 
-go 1.25
+go 1.27

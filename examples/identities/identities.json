@@ -1,0 +1,104 @@
+{
+  "identities": [
+    {
+      "serial_number": "PNOLV-000123-00001",
+      "given_name": "Anna",
+      "family_name": "Paraudziņa"
+    },
+    {
+      "serial_number": "PNOLV-000123-00002",
+      "given_name": "Jānis",
+      "family_name": "Paraugs"
+    },
+    {
+      "serial_number": "PNOLV-000123-00003",
+      "given_name": "Elīna",
+      "family_name": "Testere"
+    },
+    {
+      "serial_number": "PNOLV-000123-00004",
+      "given_name": "Mārtiņš",
+      "family_name": "Paraudziņš"
+    },
+    {
+      "serial_number": "PNOLV-000123-00005",
+      "given_name": "Ieva",
+      "family_name": "Paraudziņa"
+    },
+    {
+      "serial_number": "PNOLV-000123-00006",
+      "given_name": "Kārlis",
+      "family_name": "Testeris"
+    },
+    {
+      "serial_number": "PNOLV-000123-00007",
+      "given_name": "Līga",
+      "family_name": "Testere"
+    },
+    {
+      "serial_number": "PNOLV-000123-00008",
+      "given_name": "Roberts",
+      "family_name": "Paraugs"
+    },
+    {
+      "serial_number": "PNOLV-000123-00009",
+      "given_name": "Marta",
+      "family_name": "Paraudziņa"
+    },
+    {
+      "serial_number": "PNOLV-000123-00010",
+      "given_name": "Artūrs",
+      "family_name": "Testeris"
+    },
+    {
+      "serial_number": "PNOLV-000123-00011",
+      "given_name": "Sabīne",
+      "family_name": "Testere"
+    },
+    {
+      "serial_number": "PNOLV-000123-00012",
+      "given_name": "Edgars",
+      "family_name": "Paraudziņš"
+    },
+    {
+      "serial_number": "PNOLV-000123-00013",
+      "given_name": "Dace",
+      "family_name": "Paraudziņa"
+    },
+    {
+      "serial_number": "PNOLV-000123-00014",
+      "given_name": "Toms",
+      "family_name": "Paraugs"
+    },
+    {
+      "serial_number": "PNOLV-000123-00015",
+      "given_name": "Kristīne",
+      "family_name": "Testere"
+    },
+    {
+      "serial_number": "PNOLV-000123-00016",
+      "given_name": "Raitis",
+      "family_name": "Testeris"
+    },
+    {
+      "serial_number": "PNOLV-000123-00017",
+      "given_name": "Laura",
+      "family_name": "Paraudziņa"
+    },
+    {
+      "serial_number": "PNOLV-000123-00018",
+      "given_name": "Normunds",
+      "family_name": "Paraudziņš"
+    },
+    {
+      "serial_number": "PNOLV-000123-00019",
+      "given_name": "Agnese",
+      "family_name": "Testere"
+    },
+    {
+      "serial_number": "PNOLV-000123-00020",
+      "given_name": "Oskars",
+      "family_name": "Paraugs"
+    }
+  ]
+}

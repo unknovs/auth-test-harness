@@ -12,7 +12,9 @@ http://localhost:8080
 
 ## Authentication Methods
 
-The service supports two authentication methods controlled by the `acr_values` parameter and set as environmental values (two type of users can be defined)
+The service supports three authentication methods — Mobile ID, Smart Card and eID Scan — selected by the `acr_values` parameter and configured as environment values. Each method has its own user profile (name, and optionally its own identity code), so more than one person can be represented by a single instance.
+
+With `USED_IDENTITIES=list`, Mobile ID and eID Scan instead ask for a personal code and answer as the person an identity list names for it (see [Code Step](#5b-code-step-identity-list)); the smart card keeps its configured profile.
 
 ## Endpoints
 
@@ -30,11 +32,12 @@ Returns service metadata and available endpoints.
 {
   "service": "OAuth OIDC Mock Service",
   "version": "1.0.0",
-  "openid_configuration": "http://localhost:8080/.well-known/openid_configuration",
+  "openid_configuration": "http://localhost:8080/.well-known/openid-configuration",
   "endpoints": {
     "authorize": "as defined in AUTHORIZATION_ENDPOINT environment variable",
     "token": "as defined in TOKEN_ENDPOINT environment variable",
     "userinfo": "as defined in USERINFO_ENDPOINT environment variable",
+    "logout": "as defined in LOGOUT_ENDPOINT environment variable (listed only when set)",
     "health": "/health"
   },
   "supported_scopes": ["as defined in SCOPES_SUPPORTED environment variable"],
@@ -47,7 +50,7 @@ Returns service metadata and available endpoints.
 ### 2. OpenID Connect Discovery
 
 ```http
-GET /.well-known/openid_configuration
+GET /.well-known/openid-configuration
 ```
 
 Returns OpenID Connect Discovery information (RFC 8414 compliant).
@@ -107,6 +110,18 @@ HTTP/1.1 302 Found
 Location: https://example.com/callback?code=AUTHORIZATION_CODE&state=xyz123
 ```
 
+**With an identity list** (`USED_IDENTITIES=list`), a valid request for Mobile ID or eID Scan is answered with the sign-in page first, and the redirect above follows the [Code Step](#5b-code-step-identity-list):
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+
+<form method="post" action="/identify">
+<input type="hidden" name="request" value="REQUEST_ID">
+<input id="code" name="code" ...>
+...
+```
+
 **Error Response:**
 
 ```http
@@ -142,6 +157,8 @@ Content-Type: application/x-www-form-urlencoded
 | `code` | Yes | Authorization code from step 1 |
 | `redirect_uri` | Yes | Must match authorization request |
 
+(The authorization request may carry `nonce`; it comes back inside the `id_token`.)
+
 **Example Request:**
 
 ```http
@@ -158,9 +175,17 @@ grant_type=authorization_code&code=AUTH_CODE&redirect_uri=https://example.com/ca
 {
   "access_token": "ACCESS_TOKEN",
   "token_type": "Bearer",
-  "expires_in": 600
+  "expires_in": 600,
+  "scope": "urn:lvrtc:fpeil:aa",
+  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ..."
 }
 ```
+
+The `id_token` is a JWT signed RS256 with the key published at the JWKS endpoint (below). Its claims:
+`iss` (`PROTOCOL://HOST`), `aud` (the `client_id` of the authorization request), `sub` (the profile's
+stable subject — equal to the userinfo `sub`), `iat`, `exp`, `nonce` (when the authorization request
+carried one), `name`, `given_name`, `family_name`, `amr`; `acr` for the eParaksts-shaped profiles;
+`oid` and `acct` (`0` member, `1` guest) for the directory profiles.
 
 **Error Response:**
 
@@ -169,6 +194,19 @@ grant_type=authorization_code&code=AUTH_CODE&redirect_uri=https://example.com/ca
   "error": "invalid_grant",
   "error_description": "Invalid or expired authorization code"
 }
+```
+
+### 4b. JWKS Endpoint
+
+```http
+GET /.well-known/jwks.json
+```
+
+The key set the `id_token` verifies against: one RSA key, `use: sig`, `alg: RS256`, its `kid` the one
+every token's header carries. Generated when the service starts — a restart rotates it.
+
+```json
+{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"…","n":"…","e":"AQAB"}]}
 ```
 
 ### 5. UserInfo Endpoint
@@ -187,18 +225,18 @@ Authorization: Bearer ACCESS_TOKEN
 
 **Success Response:**
 
-if not specific `ACR_VALUES_SUPPORTED`set below info will be responded:
+The answer for Mobile ID or eID Scan (the smart card answers its own flow as `acr` and `urn:eparaksts:tws:policies:authentication:adaptive:methods:sc_plugin` as `amr`):
 
 ```json
 {
   "sub": "UNIQUE_USER_ID",
   "domain": "citizen",
-  "acr": "urn:safelayer:tws:policies:authentication:level:high",
-  "amr": ["urn:authentication:adaptive:methods:plugin"],
-  "given_name": "as defined in SC_GIVEN_NAME environment variable",
-  "family_name": "as defined in SC_FAMILY_NAME environment variable",
-  "name": "as defined in SC_GIVEN_NAME + SC_FAMILY_NAME environment variables",
-  "serial_number": "as defined in SERIAL_NUMBER environment variable",
+  "acr": "the requested acr_values (the flow), echoed back",
+  "amr": ["urn:safelayer:tws:policies:authentication:adaptive:methods:mobileid"],
+  "given_name": "the flow's profile (MOBILE_GIVEN_NAME / EIDSCAN_GIVEN_NAME), or the listed person's",
+  "family_name": "the flow's profile (MOBILE_FAMILY_NAME / EIDSCAN_FAMILY_NAME), or the listed person's",
+  "name": "given_name + family_name",
+  "serial_number": "the flow's profile (MOBILE_SERIAL_NUMBER / EIDSCAN_SERIAL_NUMBER, default SERIAL_NUMBER), or the listed person's",
   "eips": ""
 }
 ```
@@ -209,6 +247,86 @@ if not specific `ACR_VALUES_SUPPORTED`set below info will be responded:
 {
   "error": "invalid_token",
   "error_description": "Invalid or expired access token"
+}
+```
+
+### 5b. Code Step (identity list)
+
+```http
+POST /identify
+Content-Type: application/x-www-form-urlencoded
+```
+
+Served only with `USED_IDENTITIES=list`. Takes the personal code entered on the sign-in page.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `request` | Yes | The waiting request, from the page's hidden field |
+| `code` | Yes | The person's code: the full serial number (`PNOLV-…`) or the code without its prefix, any letter case |
+
+**Example Request:**
+
+```http
+POST /identify
+Content-Type: application/x-www-form-urlencoded
+
+request=REQUEST_ID&code=PNOLV-000123-00001
+```
+
+**A listed code** — back to the client, as the authorization endpoint answers:
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/callback?code=AUTHORIZATION_CODE&state=xyz123
+```
+
+The login then answers as that person: userinfo and the `id_token` carry their `given_name`, `family_name`, `name` and `serial_number`, the requested flow as `acr`, the platform's method as `amr` (the same for both mobile flows), and a `sub` derived from the method and the code (the same on every login by one method; different by the other).
+
+**A code the list does not name** (or an empty one) — the page again, with the reason and the same `request`, so the code can be corrected: `200 OK`, `text/html`.
+
+**A request the step does not hold** (never issued, expired after 10 minutes, or already answered) — `400 Bad Request`, `text/html`, with no form.
+
+**The list:** built in (twenty made-up people, `PNOLV-000123-00001` … `-00020`), or your own file at `IDENTITIES_FILE`, in this format:
+
+```json
+{
+  "identities": [
+    { "serial_number": "PNOLV-000123-00001", "given_name": "Anna", "family_name": "Paraudziņa" }
+  ]
+}
+```
+
+Your file is read again whenever it changes, checked at each code entry; a file that cannot be used is refused with a log line and the last good list stays in use. Details: README, *The identity list*.
+
+### 5c. Logout Endpoint
+
+```http
+GET [as defined in LOGOUT_ENDPOINT environment variable]?redirect_uri=...
+```
+
+Served only when `LOGOUT_ENDPOINT` is set (the eParaksts path: `/trustedx-authserver/lvrtc-eipsign-idp/logout`).
+
+**Example Request:**
+
+```http
+GET /trustedx-authserver/lvrtc-eipsign-idp/logout?redirect_uri=https%3A%2F%2Fexample.com%2Fsigned-out
+```
+
+**Success Response:**
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/signed-out
+```
+
+The service keeps no sign-in session, so there is nothing else to end; access tokens already issued stay valid until they expire.
+
+**Error Response** (no `redirect_uri`, or a relative one):
+
+```json
+{
+  "error": "invalid_request",
+  "error_description": "redirect_uri is required"
 }
 ```
 
@@ -252,6 +370,9 @@ Environment variables:
 | `AUTHORIZATION_ENDPOINT` | Authorization endpoint path |
 | `TOKEN_ENDPOINT` | Token endpoint path |
 | `USERINFO_ENDPOINT` | UserInfo endpoint path |
+| `LOGOUT_ENDPOINT` | Logout endpoint path (optional; unset, not served) |
+| `USED_IDENTITIES` | `config` (default: the configured profiles) or `list` (Mobile ID and eID Scan answer as the person whose code is entered) |
+| `IDENTITIES_FILE` | Optional with `list`: the path of your own identity list; unset, the built-in list of twenty made-up people (`PNOLV-000123-00001` … `-00020`) |
 | `SCOPES_SUPPORTED` | Comma-separated list of supported scopes |
 | `ACR_VALUES_SUPPORTED` | Comma-separated list of supported ACR values |
 | `SERIAL_NUMBER` | Serial number for user profiles |
@@ -264,6 +385,7 @@ Environment variables:
 
 - **Authorization codes**: 10 minutes
 - **Access tokens**: 10 minutes (600 seconds)
+- **A sign-in waiting at the code step**: 10 minutes
 
 ## Security Notes
 
