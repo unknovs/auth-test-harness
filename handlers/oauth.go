@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/unknovs/auth-test-harness/env"
+	"github.com/unknovs/auth-test-harness/identities"
 	"github.com/unknovs/auth-test-harness/routes/requests"
 	"github.com/unknovs/auth-test-harness/routes/responses"
 	"github.com/unknovs/auth-test-harness/utils"
@@ -19,6 +20,27 @@ type OAuthHandler struct {
 	config *env.Config
 	store  *utils.InMemoryStore
 	key    *utils.SigningKey
+	// identities, when set, is who the flows that take a personal code answer
+	// as: the person whose code is entered at the code step.
+	identities *identities.List
+}
+
+// SetIdentityList makes the flows that take a personal code — Mobile ID and eID
+// Scan — ask for the code at the code step and answer as the person the list
+// names for it. The other flows keep their configured profiles.
+func (h *OAuthHandler) SetIdentityList(l *identities.List) {
+	h.identities = l
+}
+
+// UsesIdentityList reports whether an identity list is in use, and so whether
+// the code step is served.
+func (h *OAuthHandler) UsesIdentityList() bool {
+	return h.identities != nil
+}
+
+// codeEntered reports whether a requested flow asks the person for their code.
+func (h *OAuthHandler) codeEntered(acrValues string) bool {
+	return h.identities != nil && (acrValues == flowMobileID || acrValues == flowEIDScan)
 }
 
 // NewOAuthHandler creates a new OAuth handler. key signs the id_tokens; it is
@@ -107,11 +129,38 @@ func (h *OAuthHandler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	pending := utils.PendingAuthorization{
+		ClientID:    req.ClientID,
+		RedirectURI: req.RedirectURI,
+		Scope:       req.Scope,
+		ACRValues:   req.ACRValues,
+		State:       req.State,
+		Nonce:       req.Nonce,
+	}
+
+	// A flow that takes the person's code asks for it first; the client is
+	// answered once it is entered.
+	if h.codeEntered(req.ACRValues) {
+		if _, err := url.Parse(req.RedirectURI); err != nil {
+			h.sendError(w, "invalid_request", "Invalid redirect_uri")
+			return
+		}
+		h.startCodeStep(w, pending)
+		return
+	}
+
+	h.redirectWithCode(w, r, pending, nil)
+}
+
+// redirectWithCode answers an authorization request: a fresh code, stored with
+// who it is for, sent back to the client's redirect_uri with its state. person
+// is the person entered at the code step, or nil for a configured profile.
+func (h *OAuthHandler) redirectWithCode(w http.ResponseWriter, r *http.Request, req utils.PendingAuthorization, person *identities.Person) {
 	// Generate authorization code
 	code := utils.GenerateAuthCode()
 
 	// Store the authorization code (with the nonce the id_token must carry back)
-	h.store.StoreAuthCode(code, req.ClientID, req.RedirectURI, req.Scope, req.ACRValues, req.Nonce)
+	h.store.StoreAuthCode(code, req.ClientID, req.RedirectURI, req.Scope, req.ACRValues, req.Nonce, person)
 
 	// The code is this service's own generated value and the client id came from the
 	// request; both are echoed into a test-run log on a loopback address, never into a
@@ -203,7 +252,7 @@ func (h *OAuthHandler) TokenHandler(w http.ResponseWriter, r *http.Request) {
 	accessToken := utils.GenerateAccessToken()
 
 	// Store access token
-	h.store.StoreAccessToken(accessToken, authCodeData.ACRValues)
+	h.store.StoreAccessToken(accessToken, authCodeData.ACRValues, authCodeData.Person)
 
 	// The id_token: who logged in, signed with the published key, bound to the
 	// client that asked and to the nonce it sent.
@@ -218,6 +267,7 @@ func (h *OAuthHandler) TokenHandler(w http.ResponseWriter, r *http.Request) {
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
 		ExpiresIn:   h.config.TokenExpirationMin * 60, // Convert to seconds
+		Scope:       authCodeData.Scope,
 		IDToken:     idToken,
 	}
 
@@ -252,8 +302,8 @@ func (h *OAuthHandler) UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate user info based on ACR values
-	response := h.generateUserInfo(tokenData.ACRValues)
+	// Generate user info based on ACR values (and the person entered, if any)
+	response := h.generateUserInfo(tokenData.ACRValues, tokenData.Person)
 
 	w.Header().Set("Content-Type", "application/json")
 	// The status and headers are already on the wire; an encode failure here can
@@ -285,10 +335,10 @@ type profile struct {
 // a person on their identity code then see a DIFFERENT person per flow, which is
 // what lets one instance stand in for two parties — an owner and a counterparty —
 // in a flow where a document is shared between them. Unset per profile, they all
-// report the one SERIAL_NUMBER, i.e. the same person by any method. The
-// authentication method is reported in the amr, derived from the flow that was
-// requested, so a client that forces a specific method gets that method back and
-// can verify the binding.
+// report the one SERIAL_NUMBER, i.e. the same person by any method. The acr and
+// amr are what the platform answers: the acr echoes the requested flow, and the
+// amr names the platform's method (see amrFor), so a client tells the two mobile
+// flows apart by the acr alone, as it must against the platform.
 //
 // The directory flows answer as a person with a work account: a name, a durable
 // object id, an account status — and no identity code, because a directory holds
@@ -298,7 +348,12 @@ type profile struct {
 // The subject is STABLE per profile — the same on every login, different between
 // profiles — because a provider's `sub` identifies a person: a client stores a
 // credential under it and checks that the id_token and userinfo name the same one.
-func (h *OAuthHandler) profileFor(acrValues string) profile {
+//
+// person is the person entered at the code step, when an identity list is in
+// use: the login then answers as that person, and its subject derives from the
+// person's code alone, so it is the same on every login and by either method
+// that takes the code, as one account's would be.
+func (h *OAuthHandler) profileFor(acrValues string, person *identities.Person) profile {
 	var p profile
 
 	switch acrValues {
@@ -330,20 +385,36 @@ func (h *OAuthHandler) profileFor(acrValues string) profile {
 		p.SerialNumber = h.config.SCSerialNumber
 	}
 
+	if person != nil && !p.Directory {
+		p.GivenName = person.GivenName
+		p.FamilyName = person.FamilyName
+		p.SerialNumber = person.SerialNumber
+	}
+
 	if !p.Directory {
-		p.ACR = "urn:safelayer:tws:policies:authentication:level:high" // hardcoded, as the provider reports it
-		p.AMR = []string{amrForFlow(acrValues)}
-		// One credential per method for a person: the subject is the profile's.
-		p.Sub = utils.StableSubject(acrValues, p.SerialNumber, p.GivenName, p.FamilyName)
+		// The platform answers the requested flow as the acr: an authentication
+		// context, not a level of assurance.
+		p.ACR = acrValues
+		p.AMR = []string{amrFor(acrValues)}
+		if person != nil {
+			// A listed person's subject is theirs for each method, as at the
+			// platform, where the same person signs in under a different subject
+			// by each method.
+			p.Sub = utils.StableSubject("identity-list", acrValues, strings.ToUpper(person.SerialNumber))
+		} else {
+			// One credential per method for a person: the subject is the profile's.
+			p.Sub = utils.StableSubject(acrValues, p.SerialNumber, p.GivenName, p.FamilyName)
+		}
 	}
 	p.Name = strings.TrimSpace(p.GivenName + " " + p.FamilyName)
 
 	return p
 }
 
-// generateUserInfo generates user information based on ACR values
-func (h *OAuthHandler) generateUserInfo(acrValues string) *responses.UserInfoResponse {
-	p := h.profileFor(acrValues)
+// generateUserInfo generates user information based on ACR values, as the person
+// entered at the code step when there is one
+func (h *OAuthHandler) generateUserInfo(acrValues string, person *identities.Person) *responses.UserInfoResponse {
+	p := h.profileFor(acrValues, person)
 
 	return &responses.UserInfoResponse{
 		Sub:          p.Sub,
@@ -364,7 +435,7 @@ func (h *OAuthHandler) generateUserInfo(acrValues string) *responses.UserInfoRes
 // — for a directory profile — the durable object id and the account status,
 // which is where a directory puts them (its userinfo carries neither).
 func (h *OAuthHandler) idToken(code utils.AuthCodeData) (string, error) {
-	p := h.profileFor(code.ACRValues)
+	p := h.profileFor(code.ACRValues, code.Person)
 	now := time.Now()
 	claims := map[string]any{
 		"iss":         h.config.Protocol + "://" + h.config.Host,
@@ -402,7 +473,12 @@ const (
 	flowDirectory      = "urn:auth-test-harness:flow:directory"
 	flowDirectoryGuest = "urn:auth-test-harness:flow:directory-guest"
 
-	// The reported-method prefix: this URN plus the method segment forms the amr.
+	// The method the platform reports for both of its mobile flows, eParaksts
+	// Mobile and eID Scan alike: the two are told apart only by the acr.
+	amrMobile = "urn:safelayer:tws:policies:authentication:adaptive:methods:mobileid"
+
+	// The documented reported-method prefix: this URN plus the method segment
+	// forms the amr of a flow whose answer has not been measured.
 	amrMethodPrefix = "urn:eparaksts:tws:policies:authentication:adaptive:methods:"
 	// The method a directory login reports.
 	amrDirectory = "urn:auth-test-harness:methods:directory"
@@ -411,17 +487,23 @@ const (
 	accountStatusGuest = 1
 )
 
-// amrForFlow maps a requested flow URN to the reported authentication-method
-// URN by carrying its trailing method segment across — so mobileid, sc_plugin,
-// mobile-eid and any future flow segment are all reported truthfully without a
-// per-method branch. An unrecognisable value reports the smart-card method, the
-// same fallback the name profile uses.
-//
-// Note for anyone comparing against the live platform: it currently reports the
-// same amr (…methods:mobileid) for both the mobile and the eID Scan flow and
-// distinguishes them only in the acr. Reporting the requested method here is the
-// more useful behaviour for a test double, because it lets a caller assert that
-// the method it forced is the method it got.
+// amrFor is the reported authentication method for a requested flow, as the
+// platform reports it: the one mobile method for both mobile flows — eID Scan
+// rides the same mechanism as eParaksts Mobile, and the platform reports it so —
+// and, for any other flow, the documented method URN (amrForFlow).
+func amrFor(acrValues string) string {
+	if acrValues == flowMobileID || acrValues == flowEIDScan {
+		return amrMobile
+	}
+
+	return amrForFlow(acrValues)
+}
+
+// amrForFlow maps a requested flow URN to the documented authentication-method
+// URN by carrying its trailing method segment across, for the flows whose answer
+// has not been measured (the smart card, and any future flow segment). An
+// unrecognisable value reports the smart-card method, the same fallback the name
+// profile uses.
 func amrForFlow(acrValues string) string {
 	segment := ""
 	if i := strings.LastIndex(acrValues, ":"); i >= 0 && i+1 < len(acrValues) {

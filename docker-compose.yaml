@@ -13,6 +13,9 @@ services:
       AUTHORIZATION_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as"
       TOKEN_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as/token"
       USERINFO_ENDPOINT: "/trustedx-resources/openid/v1/users/me"
+      # The identity provider's logout: the browser is sent here with a
+      # redirect_uri and is sent back to it.
+      LOGOUT_ENDPOINT: "/trustedx-authserver/lvrtc-eipsign-idp/logout"
       SCOPES_SUPPORTED: "urn:lvrtc:fpeil:aa"
       # The eParaksts-shaped flows, plus the two directory flows: a work account at
       # the person's organisation (a member of its directory) and the same person
@@ -33,5 +36,37 @@ services:
       # when unset), never an identity code.
       DIRECTORY_GIVEN_NAME: "Ilze"
       DIRECTORY_FAMILY_NAME: "Ozola"
+
+    restart: unless-stopped
+
+  # The same service with an identity list: Mobile ID and eID Scan ask for a
+  # personal code and answer as the person the list names for it; the smart card
+  # keeps its configured profile. With no IDENTITIES_FILE it uses the built-in
+  # list of twenty made-up people, PNOLV-000123-00001 to -00020.
+  auth-test-harness-list:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      HOST: "localhost:8081"
+      BASIC_AUTH_VALUE: "dGVzdDp0ZXN0" # base64 for test:test
+      AUTHORIZATION_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as"
+      TOKEN_ENDPOINT: "/trustedx-authserver/oauth/lvrtc-eipsign-as/token"
+      USERINFO_ENDPOINT: "/trustedx-resources/openid/v1/users/me"
+      LOGOUT_ENDPOINT: "/trustedx-authserver/lvrtc-eipsign-idp/logout"
+      SCOPES_SUPPORTED: "urn:lvrtc:fpeil:aa"
+      ACR_VALUES_SUPPORTED: "urn:eparaksts:authentication:flow:mobileid,urn:eparaksts:authentication:flow:sc_plugin,urn:eparaksts:authentication:flow:mobile-eid"
+      SERIAL_NUMBER: "PNOLV-111111-11111"
+      SC_GIVEN_NAME: "John"
+      SC_FAMILY_NAME: "Cardreader"
+      USED_IDENTITIES: "list"
+      # Your own people instead: name the file, and mount its DIRECTORY (an
+      # editor that saves by replacing the file would leave a single-file mount
+      # on the old one). An edit is picked up at the next login, no restart.
+      # IDENTITIES_FILE: "/identities/identities.json"
+    # volumes:
+    #   - ./my-identities:/identities:ro
 
     restart: unless-stopped

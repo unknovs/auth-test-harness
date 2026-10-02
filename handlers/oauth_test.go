@@ -48,9 +48,9 @@ func testHandler() *OAuthHandler {
 	}, utils.NewInMemoryStore(), key)
 }
 
-// Each requested flow must come back with its own name profile and with the
-// method it asked for reported in the amr, so a caller can verify that the
-// method it forced is the method it got.
+// Each requested flow must come back with its own name profile, the flow echoed
+// as the acr, and the method the platform reports in the amr: one mobile method
+// for both mobile flows, which only the acr tells apart.
 func TestGenerateUserInfoPerFlow(t *testing.T) {
 	h := testHandler()
 
@@ -66,7 +66,7 @@ func TestGenerateUserInfoPerFlow(t *testing.T) {
 		{
 			name:       "mobile",
 			acrValues:  flowMobileID,
-			wantAMR:    amrMethodPrefix + "mobileid",
+			wantAMR:    amrMobile,
 			wantGiven:  "Jane",
 			wantFamily: "Mobile",
 			wantName:   "Jane Mobile",
@@ -86,7 +86,7 @@ func TestGenerateUserInfoPerFlow(t *testing.T) {
 			// party in a flow where a document is shared between two people.
 			name:       "eID Scan",
 			acrValues:  flowEIDScan,
-			wantAMR:    amrMethodPrefix + "mobile-eid",
+			wantAMR:    amrMobile,
 			wantGiven:  "Erik",
 			wantFamily: "Scanner",
 			wantName:   "Erik Scanner",
@@ -96,10 +96,13 @@ func TestGenerateUserInfoPerFlow(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := h.generateUserInfo(tc.acrValues)
+			got := h.generateUserInfo(tc.acrValues, nil)
 
 			if len(got.AMR) != 1 || got.AMR[0] != tc.wantAMR {
 				t.Errorf("amr = %v, want [%s]", got.AMR, tc.wantAMR)
+			}
+			if got.ACR != tc.acrValues {
+				t.Errorf("acr = %q, want the requested flow %q", got.ACR, tc.acrValues)
 			}
 			if got.GivenName != tc.wantGiven || got.FamilyName != tc.wantFamily {
 				t.Errorf("name parts = %q %q, want %q %q", got.GivenName, got.FamilyName, tc.wantGiven, tc.wantFamily)

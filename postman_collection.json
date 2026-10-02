@@ -266,6 +266,263 @@
 				"description": "Retrieves user information using the access token. This will return Mobile ID user profile if acr_values was mobileid."
 			},
 			"response": []
+		},
+		{
+			"name": "Logout",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/trustedx-authserver/lvrtc-eipsign-idp/logout?redirect_uri=https://example.com/signed-out",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"trustedx-authserver",
+						"lvrtc-eipsign-idp",
+						"logout"
+					],
+					"query": [
+						{
+							"key": "redirect_uri",
+							"value": "https://example.com/signed-out"
+						}
+					]
+				},
+				"description": "The identity provider's logout (LOGOUT_ENDPOINT): redirects (302) to redirect_uri. The service keeps no sign-in session, so there is nothing else to end; tokens already issued stay valid until they expire."
+			},
+			"protocolProfileBehavior": {
+				"followRedirects": false
+			},
+			"response": []
+		},
+		{
+			"name": "Identity list: Authorization Request (Mobile ID)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('the sign-in page asks for a personal code', () => pm.response.to.have.status(200));",
+							"const m = pm.response.text().match(/name=\"request\" value=\"([^\"]+)\"/);",
+							"if (m) { pm.collectionVariables.set('pending_request', m[1]); }"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/trustedx-authserver/oauth/lvrtc-eipsign-as?response_type=code&client_id=demo_client&redirect_uri=https://example.com/callback&scope=urn:lvrtc:fpeil:aa&acr_values=urn:eparaksts:authentication:flow:mobileid&state=xyz123",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"trustedx-authserver",
+						"oauth",
+						"lvrtc-eipsign-as"
+					],
+					"query": [
+						{
+							"key": "response_type",
+							"value": "code"
+						},
+						{
+							"key": "client_id",
+							"value": "demo_client"
+						},
+						{
+							"key": "redirect_uri",
+							"value": "https://example.com/callback"
+						},
+						{
+							"key": "scope",
+							"value": "urn:lvrtc:fpeil:aa"
+						},
+						{
+							"key": "acr_values",
+							"value": "urn:eparaksts:authentication:flow:mobileid"
+						},
+						{
+							"key": "state",
+							"value": "xyz123"
+						}
+					]
+				},
+				"description": "Against the auth-test-harness-list service of the compose file (USED_IDENTITIES=list). Mobile ID and eID Scan answer with the sign-in page instead of a redirect; this request keeps the id of the waiting request in pending_request."
+			},
+			"response": []
+		},
+		{
+			"name": "Identity list: Code Step",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('back to the client with a code', () => pm.response.to.have.status(302));",
+							"const loc = pm.response.headers.get('Location');",
+							"const m = loc && loc.match(/[?&]code=([^&]+)/);",
+							"if (m) { pm.collectionVariables.set('list_auth_code', decodeURIComponent(m[1])); }"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/x-www-form-urlencoded"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "request",
+							"value": "{{pending_request}}",
+							"description": "The waiting request, from the sign-in page"
+						},
+						{
+							"key": "code",
+							"value": "{{listed_code}}",
+							"description": "The personal code of a person in the list: the full serial number, or the code without its PNOLV- prefix"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8081/identify",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"identify"
+					]
+				},
+				"description": "Enters the personal code on the sign-in page. A listed code redirects (302) to the client with an authorization code, kept in list_auth_code; an unknown code shows the page again."
+			},
+			"protocolProfileBehavior": {
+				"followRedirects": false
+			},
+			"response": []
+		},
+		{
+			"name": "Identity list: Token Request",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    pm.collectionVariables.set('list_access_token', pm.response.json().access_token);",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "username",
+							"value": "test",
+							"type": "string"
+						},
+						{
+							"key": "password",
+							"value": "test",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/x-www-form-urlencoded"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "grant_type",
+							"value": "authorization_code"
+						},
+						{
+							"key": "code",
+							"value": "{{list_auth_code}}"
+						},
+						{
+							"key": "redirect_uri",
+							"value": "https://example.com/callback"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8081/trustedx-authserver/oauth/lvrtc-eipsign-as/token",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"trustedx-authserver",
+						"oauth",
+						"lvrtc-eipsign-as",
+						"token"
+					]
+				},
+				"description": "Exchanges the code from the code step."
+			},
+			"response": []
+		},
+		{
+			"name": "Identity list: UserInfo Request",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{list_access_token}}"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8081/trustedx-resources/openid/v1/users/me",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"trustedx-resources",
+						"openid",
+						"v1",
+						"users",
+						"me"
+					]
+				},
+				"description": "Answers as the person whose code was entered: their names and serial_number, and a subject that is the same on every login of that code."
+			},
+			"response": []
 		}
 	],
 	"variable": [
@@ -311,6 +568,31 @@
 		},
 		{
 			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "acr_values_eidscan",
+			"value": "urn:eparaksts:authentication:flow:mobile-eid",
+			"type": "string"
+		},
+		{
+			"key": "listed_code",
+			"value": "PNOLV-000123-00001",
+			"type": "string"
+		},
+		{
+			"key": "pending_request",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "list_auth_code",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "list_access_token",
 			"value": "",
 			"type": "string"
 		}

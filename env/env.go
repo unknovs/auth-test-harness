@@ -18,6 +18,9 @@ type Config struct {
 	AuthorizationEndpoint string
 	TokenEndpoint         string
 	UserInfoEndpoint      string
+	// The identity provider's session-termination endpoint. Optional: unset, it
+	// is not served.
+	LogoutEndpoint string
 
 	// Supported values
 	ScopesSupported    []string
@@ -51,7 +54,20 @@ type Config struct {
 	DirectoryGivenName  string
 	DirectoryFamilyName string
 	DirectoryObjectID   string
+
+	// Where the people of the flows that take a personal code — Mobile ID and
+	// eID Scan — come from: IdentitiesFromConfig (the profiles above, one per
+	// flow) or IdentitiesFromList (the person whose code is entered, looked up
+	// in the built-in list, or in IdentitiesFile when it is set).
+	UsedIdentities string
+	IdentitiesFile string
 }
+
+// The values of USED_IDENTITIES.
+const (
+	IdentitiesFromConfig = "config"
+	IdentitiesFromList   = "list"
+)
 
 // Load loads environment variables with default values
 func Load() *Config {
@@ -67,6 +83,7 @@ func Load() *Config {
 		AuthorizationEndpoint: os.Getenv("AUTHORIZATION_ENDPOINT"),
 		TokenEndpoint:         os.Getenv("TOKEN_ENDPOINT"),
 		UserInfoEndpoint:      os.Getenv("USERINFO_ENDPOINT"),
+		LogoutEndpoint:        os.Getenv("LOGOUT_ENDPOINT"),
 
 		// Supported values
 		ScopesSupported:    getEnvArray("SCOPES_SUPPORTED", ""),
@@ -95,6 +112,9 @@ func Load() *Config {
 		DirectoryGivenName:  getEnv("DIRECTORY_GIVEN_NAME", "Ilze"),
 		DirectoryFamilyName: getEnv("DIRECTORY_FAMILY_NAME", "Ozola"),
 		DirectoryObjectID:   os.Getenv("DIRECTORY_OBJECT_ID"),
+
+		UsedIdentities: getEnv("USED_IDENTITIES", IdentitiesFromConfig),
+		IdentitiesFile: os.Getenv("IDENTITIES_FILE"),
 	}
 	return config
 }

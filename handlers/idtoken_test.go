@@ -21,18 +21,18 @@ import (
 func TestProfileSubjectIsStableAndPerProfile(t *testing.T) {
 	h := testHandler()
 
-	if a, b := h.profileFor(flowMobileID).Sub, h.profileFor(flowMobileID).Sub; a != b || a == "" {
+	if a, b := h.profileFor(flowMobileID, nil).Sub, h.profileFor(flowMobileID, nil).Sub; a != b || a == "" {
 		t.Fatalf("the mobile profile's subject changed between two logins: %q vs %q", a, b)
 	}
-	if h.profileFor(flowMobileID).Sub == h.profileFor(flowEIDScan).Sub {
+	if h.profileFor(flowMobileID, nil).Sub == h.profileFor(flowEIDScan, nil).Sub {
 		t.Fatal("two different people share one subject")
 	}
-	if h.profileFor(flowDirectory).Sub != h.profileFor(flowDirectoryGuest).Sub {
+	if h.profileFor(flowDirectory, nil).Sub != h.profileFor(flowDirectoryGuest, nil).Sub {
 		t.Fatal("the guest variant of the directory profile is the same person, and must keep the subject")
 	}
 	// A fresh handler with the same configuration answers the same subjects: a
 	// restart does not turn a known person into a stranger.
-	if testHandler().profileFor(flowDirectory).Sub != h.profileFor(flowDirectory).Sub {
+	if testHandler().profileFor(flowDirectory, nil).Sub != h.profileFor(flowDirectory, nil).Sub {
 		t.Fatal("the directory profile's subject is not stable across restarts")
 	}
 }
@@ -43,7 +43,7 @@ func TestProfileSubjectIsStableAndPerProfile(t *testing.T) {
 func TestDirectoryProfileHasNoIdentityCode(t *testing.T) {
 	h := testHandler()
 
-	info := h.generateUserInfo(flowDirectory)
+	info := h.generateUserInfo(flowDirectory, nil)
 	if info.SerialNumber != "" || info.ACR != "" {
 		t.Fatalf("a directory profile must carry no identity code and no acr, got serial=%q acr=%q", info.SerialNumber, info.ACR)
 	}
@@ -100,7 +100,7 @@ func decodeJWT(t *testing.T, tok string) (header, payload map[string]any, signin
 // the service publishes.
 func TestIDTokenCarriesTheLoginAndVerifiesWithThePublishedKey(t *testing.T) {
 	h := testHandler()
-	p := h.profileFor(flowDirectory)
+	p := h.profileFor(flowDirectory, nil)
 
 	tok, err := h.idToken(utils.AuthCodeData{ClientID: "cid", ACRValues: flowDirectory, Nonce: "n-1"})
 	if err != nil {
@@ -149,7 +149,7 @@ func TestIDTokenGuestVariant(t *testing.T) {
 	if claims["acct"] != float64(accountStatusGuest) {
 		t.Fatalf("acct = %v, want %d", claims["acct"], accountStatusGuest)
 	}
-	if claims["sub"] != h.profileFor(flowDirectory).Sub || claims["oid"] != h.profileFor(flowDirectory).ObjectID {
+	if claims["sub"] != h.profileFor(flowDirectory, nil).Sub || claims["oid"] != h.profileFor(flowDirectory, nil).ObjectID {
 		t.Fatal("the guest variant must be the same person as the member")
 	}
 	if _, has := claims["nonce"]; has {
@@ -172,10 +172,10 @@ func TestIDTokenForACodedProfile(t *testing.T) {
 			t.Errorf("a coded profile's id_token carries %s", absent)
 		}
 	}
-	if claims["acr"] != "urn:safelayer:tws:policies:authentication:level:high" {
+	if claims["acr"] != flowMobileID {
 		t.Errorf("acr = %v", claims["acr"])
 	}
-	if claims["sub"] != h.generateUserInfo(flowMobileID).Sub {
+	if claims["sub"] != h.generateUserInfo(flowMobileID, nil).Sub {
 		t.Error("the id_token and userinfo must name the same subject")
 	}
 }

@@ -10,11 +10,22 @@ A mock OAuth 2.0 and OpenID Connect service for testing purposes, implementing t
 - Support for multiple authentication methods (Mobile ID, Smart Card and eID Scan)
 - A per-method user profile, each with its own name and — optionally — its own
   identity code, so one instance can stand in for two different people
+- An identity list (`USED_IDENTITIES=list`): Mobile ID and eID Scan ask for a personal
+  code and answer as the person the list names for it, so any number of test people
+  can sign in: twenty made-up people built in, or your own mounted file, changed without a restart
+- The identity provider's logout endpoint
 - Configurable through environment variables
+
+How a sign-in runs in each identity mode, as sequence diagrams: [FLOWS](FLOWS.md). What changed between
+releases: [CHANGELOG](CHANGELOG.md).
 
 ## Docker compose
 
 [Docker compose](./docker-compose.yaml) is made to automate eParaksts authentication platform tests. [Postman collection](postman_collection.json) added for this compose as well.  
+
+It runs the service twice: `auth-test-harness` on port 8080 with the configured profiles,
+and `auth-test-harness-list` on port 8081 in `list` mode, on the built-in
+[identity list](examples/identities/identities.json) (see [The identity list](#the-identity-list)).
 
 ## Docker image
 
@@ -51,6 +62,10 @@ GET [`AUTHORIZATION_ENDPOINT`]
 
 **Response:**
 
+With an identity list in use (`USED_IDENTITIES=list`), Mobile ID and eID Scan first answer the
+sign-in page that asks for a personal code ([The identity list](#the-identity-list)); the redirect
+below follows once a listed code is entered. Every other flow redirects at once.
+
 Redirects to `redirect_uri` with `code` and `state` parameters.
 
 ### 2. Token Endpoint
@@ -76,7 +91,9 @@ POST [`TOKEN_ENDPOINT`]
 {
   "access_token": "string",
   "token_type": "Bearer",
-  "expires_in": 600
+  "expires_in": 600,
+  "scope": "the scope the authorization request asked for",
+  "id_token": "…"
 }
 ```
 
@@ -96,8 +113,8 @@ GET [`USERINFO_ENDPOINT`]
 {
   "sub": "`UNIQUE_USER_ID`",
   "domain": "citizen",
-  "acr": "urn:safelayer:tws:policies:authentication:level:high",
-  "amr": ["`ACR_VALUES_SUPPORTED` used in request"],
+  "acr": "the requested `acr_values` (the flow), echoed back",
+  "amr": ["urn:safelayer:tws:policies:authentication:adaptive:methods:mobileid"],
   "given_name": "as defined in `SC_GIVEN_NAME` (or `MOBILE_GIVEN_NAME`) environment variable",
   "family_name": "as defined in `SC_FAMILY_NAME` (or `MOBILE_FAMILY_NAME`) environment variable",
   "name": "as defined in given_name + family_name environment variables",
@@ -112,20 +129,84 @@ GET [`USERINFO_ENDPOINT`]
 - Smart Card (`urn:eparaksts:authentication:flow:sc_plugin`, and any other requested flow): `SC_GIVEN_NAME`, `SC_FAMILY_NAME`, `SC_SERIAL_NUMBER`
 - eID Scan (`urn:eparaksts:authentication:flow:mobile-eid`): `EIDSCAN_GIVEN_NAME`, `EIDSCAN_FAMILY_NAME`, `EIDSCAN_SERIAL_NUMBER` (names fall back to the Smart Card ones — both are card-based)
 
-The `amr` reports the method that was actually requested: the trailing segment of
-the requested flow URN is carried into
-`urn:eparaksts:tws:policies:authentication:adaptive:methods:<segment>`. So a client
-that forces a specific method can assert it got that method, and a flow this
-service was never taught about still reports a well-formed method URN. (The live
-platform currently reports `…methods:mobileid` for both the mobile and the eID Scan
-flow and distinguishes them only in the `acr`; reporting the requested method is the
-more useful behaviour for a test double.)
+The `acr` and `amr` are what the eParaksts platform answers:
+
+- the **`acr` echoes the requested flow** (for example
+  `urn:eparaksts:authentication:flow:mobile-eid`) — an authentication context, not a level of
+  assurance;
+- the **`amr` is `urn:safelayer:tws:policies:authentication:adaptive:methods:mobileid` for both
+  Mobile ID and eID Scan**: eID Scan rides the same mechanism, and the platform reports it so. A
+  client tells the two apart by the `acr` alone, as it must against the platform;
+- for the smart card, and any other flow, the `amr` is the documented
+  `urn:eparaksts:tws:policies:authentication:adaptive:methods:<segment>`, the segment carried from
+  the requested flow (the platform's answer for these has not been measured).
 
 Each profile may carry **its own identity code**. A system that keys a person on
 their identity code then sees a *different person per flow*, which is what lets one
 instance stand in for two parties — say a document owner and a counterparty — in a
 sharing or co-signing flow. Leave the per-profile variables unset and every method
 reports the single `SERIAL_NUMBER`, i.e. the same person however they signed in.
+
+### 4. Logout Endpoint
+
+```sh
+GET [`LOGOUT_ENDPOINT`]?redirect_uri=...
+```
+
+The identity provider's session-termination endpoint, served when `LOGOUT_ENDPOINT` is set (the
+eParaksts path is `/trustedx-authserver/lvrtc-eipsign-idp/logout`). It redirects (`302`) the browser
+to `redirect_uri`. The service keeps no sign-in session — every authorization request is answered
+afresh — so there is nothing else to end, and access tokens already issued stay valid until they
+expire. A missing or relative `redirect_uri` is refused with `invalid_request`.
+
+## The identity list
+
+With `USED_IDENTITIES=list`, the flows that take a personal code — **Mobile ID and eID Scan** — ask
+for it and answer as the person the identity list names for it. So any number of test people can sign
+in, and one tester can sign in as any of them.
+
+**Nothing to manage by default.** With no `IDENTITIES_FILE`, the service uses its **built-in list of
+twenty made-up people**, `PNOLV-000123-00001` to `PNOLV-000123-00020`
+([`examples/identities/identities.json`](examples/identities/identities.json), compiled in). Set
+`IDENTITIES_FILE` only when you need specific people, such as the codes of your own test accounts; your
+file then replaces the built-in list. The smart-card flow and the directory flows take no code
+and keep their configured profiles.
+
+**The sign-in page.** The authorization request for these flows is answered with a page holding one
+field, the personal code. It is posted to `/identify`; a listed code redirects to the client with an
+authorization code, exactly as the authorization endpoint does in the other flows, and the login
+answers as that person. The code may be typed as the full serial number (`PNOLV-…`) or without its
+prefix, in any letter case. A code the list does not name shows the page again, so it can be
+corrected.
+
+**The format**, of the built-in list and of your own file at the path `IDENTITIES_FILE` sets:
+
+```json
+{
+  "identities": [
+    { "serial_number": "PNOLV-000123-00001", "given_name": "Anna", "family_name": "Paraudziņa" },
+    { "serial_number": "PNOLV-000123-00002", "given_name": "Jānis", "family_name": "Paraugs" }
+  ]
+}
+```
+
+Each entry needs all three fields, a serial number appears once, and a field the format does not
+know is refused (so a misspelt name is reported, not silently dropped). The built-in list's codes are
+chosen to be no one's: the first six digits of a Latvian personal code carrying a date of birth are that
+date, and `000123` is none (day 00).
+
+**Changing your file while the service runs.** The file is checked at every code entry and read again when
+it has changed — no restart. A file that cannot be used (malformed, a repeated code, a missing field)
+is refused with a log line naming the problem, and **the last good list stays in use**, so an edit
+with a typo in it does not take every login down. A file missing or unusable at start is logged too;
+no one can sign in from the list until it is fixed. **Mount the directory, not the file**
+(`./identities:/identities:ro`): an editor that saves by writing a new file leaves a single-file bind
+mount pointing at the old one, and Kubernetes does not refresh a ConfigMap mounted with `subPath`.
+
+**The subject.** A listed person's `sub` derives from the method and their code: the same on every
+login by one method, and after their names are edited in the list, but different by Mobile ID and
+by eID Scan — as at the platform, where one person signs in under a different subject by each
+method. (A configured profile's subject is per profile, as described in the `id_token` section.)
 
 ## Environment Variables
 
@@ -140,6 +221,16 @@ reports the single `SERIAL_NUMBER`, i.e. the same person however they signed in.
 - `AUTHORIZATION_ENDPOINT` - Authorization endpoint path
 - `TOKEN_ENDPOINT` - Token endpoint path
 - `USERINFO_ENDPOINT` - UserInfo endpoint path
+- `LOGOUT_ENDPOINT` - Logout endpoint path (optional; unset, no logout endpoint is served)
+
+### Identity Source
+
+- `USED_IDENTITIES` - `config` (the default: the user profiles below, one per flow) or `list` (Mobile
+  ID and eID Scan answer as the person whose code is entered). Any other value stops the service at
+  start.
+- `IDENTITIES_FILE` - Optional, with `list`: the path of your own identity list (for example
+  `/identities/identities.json`, its directory mounted). Unset, the built-in list of twenty made-up
+  people is used.
 
 ### Supported Values Configuration
 
