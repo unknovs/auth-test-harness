@@ -9,4 +9,5 @@ type AuthorizeRequest struct {
 	Prompt       string `json:"prompt" form:"prompt"`
 	ACRValues    string `json:"acr_values" form:"acr_values"`
 	UILocales    string `json:"ui_locales" form:"ui_locales"`
+	Nonce        string `json:"nonce" form:"nonce"`
 }
