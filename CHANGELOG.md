@@ -97,7 +97,11 @@ corrupt it.
 
 ### Other
 
-- Go 1.27.
+- Go 1.27.2 as the minimum (`go.mod`). Under Go 1.27.0 `govulncheck` finds seven standard-library
+  vulnerabilities this service's code reaches, GO-2026-6599, -6600, -6603, -6611, -6612, -6613 and -6617, in
+  `net/http` and `html/template`; under 1.27.2 it finds none. CI asks for `1.27` and the image builds from
+  `golang:1.27-alpine`, both of which take the newest 1.27 release; the minimum now refuses an older toolchain or
+  a stale cached image instead of building a vulnerable binary with it.
 - Tests cover every endpoint, including the refusals, and run with the race detector in CI.
 - A `golangci-lint` configuration; the image build caches Go modules and builds.
 - `FLOWS.md`: the sign-in in `config` and `list` mode, and logout, as sequence diagrams with each step.
